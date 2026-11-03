@@ -1,0 +1,10 @@
+nanti. PROJECT BACKUP — 3 November 2026
+
+Ini adalah arsip source code nanti, termasuk React/Vite, konfigurasi, SQL Supabase, README, dan preview desain.
+
+Cara menyimpan:
+1. Download file ZIP ini ke Files di iPad, iCloud Drive, atau komputer.
+2. Simpan satu salinan cadangan di tempat lain (misalnya Google Drive).
+3. Untuk melanjutkan, ekstrak ZIP dan baca README.md.
+
+Catatan: ZIP ini menyimpan source code; tidak termasuk database Supabase yang nantinya online, login, atau secret key. Backup data wishlist perlu dilakukan terpisah.
