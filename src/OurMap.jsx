@@ -20,7 +20,7 @@ function loadLeaflet(){
 export default function OurMap({places,memories,onBack,onEdit}) {
   const container=useRef(null),mapInstance=useRef(null),markers=useRef(null);
   const [filter,setFilter]=useState('visited');
-  const [selected,setSelected]=useState(null),[failed,setFailed]=useState(false);
+  const [selected,setSelected]=useState(null),[failed,setFailed]=useState(false),[ready,setReady]=useState(false);
   const located=useMemo(()=>places.filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)
     && (filter==='all'||(filter==='visited'?p.status==='visited':p.status==='want'))),[places,filter]);
   useEffect(()=>{
@@ -31,7 +31,7 @@ export default function OurMap({places,memories,onBack,onEdit}) {
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
         attribution:'&copy; OpenStreetMap contributors',maxZoom:18
       }).addTo(map);
-      mapInstance.current=map;markers.current=L.layerGroup().addTo(map);
+      mapInstance.current=map;markers.current=L.layerGroup().addTo(map);setReady(true);
       setTimeout(()=>map.invalidateSize(),100);
     }).catch(()=>setFailed(true));
     return ()=>{live=false;if(mapInstance.current){mapInstance.current.remove();mapInstance.current=null;markers.current=null;}};
@@ -49,7 +49,7 @@ export default function OurMap({places,memories,onBack,onEdit}) {
     });
     if(bounds.length===1)map.setView(bounds[0],13);
     else if(bounds.length>1)map.fitBounds(bounds,{padding:[35,35],maxZoom:13});
-  },[located,failed]);
+  },[located,failed,ready]);
   const relevant=selected?memories.filter(m=>m.place_id===selected.id):[];
   return <main className="main-container map-page">
     <section className="map-intro"><button className="memory-back" onClick={onBack}>← Our places</button>
