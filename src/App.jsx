@@ -278,6 +278,7 @@ export default function App() {
   const [members, setMembers] = useState([]);
   const [places, setPlaces] = useState([]);
   const [memories, setMemories] = useState([]);
+  const [photos,setPhotos]=useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -292,7 +293,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => { if (live) { setSession(data.session); setAuthReady(true); } }).catch(() => { if(live) setAuthReady(true); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, next) => {
       if(!live) return;
-      if(event === 'SIGNED_OUT') { setProfile(null); setPair(null); setMembers([]); setPlaces([]); setMemories([]); }
+      if(event === 'SIGNED_OUT') { setProfile(null); setPair(null); setMembers([]); setPlaces([]); setMemories([]); setPhotos([]); }
       setSession(next); setAuthReady(true);
     });
     return () => { live = false; subscription.unsubscribe(); };
@@ -302,17 +303,17 @@ export default function App() {
     if (!supabase || !uid) return;
     setScopeLoading(true);
     try {
-      const { data: p, error: profileErr } = await supabase.from('profiles').select('id, display_name, pair_id').eq('id', uid).single();
+      const { data: p, error: profileErr } = await supabase.from('profiles').select('id, display_name, pair_id, google_drive_email').eq('id', uid).single();
       if (profileErr) throw profileErr;
       setProfile(p);
       if (p.pair_id) {
         const [{ data: pa, error: pairErr }, { data: mem, error: memErr }] = await Promise.all([
           supabase.from('pairs').select('id, invite_code, created_at').eq('id', p.pair_id).single(),
-          supabase.from('profiles').select('id, display_name').eq('pair_id', p.pair_id)
+          supabase.from('profiles').select('id, display_name, google_drive_email').eq('pair_id', p.pair_id)
         ]);
         if (pairErr) throw pairErr; if (memErr) throw memErr;
         setPair(pa); setMembers(mem || []);
-      } else { setPair(null); setMembers([]); setPlaces([]); setMemories([]); }
+      } else { setPair(null); setMembers([]); setPlaces([]); setMemories([]); setPhotos([]); }
       setError('');
     } catch (e) { setError(e.message || 'Gagal memuat profil.'); }
     finally { setScopeLoading(false); }
@@ -367,6 +368,13 @@ export default function App() {
     await loadMemories();
   };
 
+  const loadPhotos = useCallback(async () => {
+    if(!pair?.id)return;
+    const {data,error}=await supabase.from('memory_photos').select('*').eq('pair_id',pair.id);
+    if(!error)setPhotos(data||[]);else setNotice('Photo sync: '+error.message);
+  },[pair?.id]);
+  useEffect(()=>{if(pair?.id)loadPhotos();},[pair?.id,loadPhotos]);
+
   const addPlace = useCallback(async fields => {
     if (!pair || !uid) throw new Error('Wishlist belum siap.');
     const canonical_url = normalizeUrl(fields.url);
@@ -377,6 +385,7 @@ export default function App() {
       pair_id: pair.id, saved_by:uid, source_url:fields.url.trim(), canonical_url,
       title:(fields.title || placeholderTitle(fields.url)).slice(0,160), category:fields.category || 'Other',
       city:fields.city || '', notes:fields.notes || '', status:fields.status || 'want',
+      cover_url:fields.cover_url||null,latitude:fields.latitude,longitude:fields.longitude,
       visited_at: fields.status === 'visited' ? new Date().toISOString() : null
     });
     if (addErr) { if (addErr.code === '23505') throw new Error('Link ini sudah ada di wishlist kalian ♡'); throw addErr; }
@@ -384,7 +393,7 @@ export default function App() {
   }, [pair,uid,loadPlaces]);
   const editPlace = async (place, fields) => {
     // Kolom identitas (pair_id, saved_by, URL) tidak dapat diubah melalui frontend.
-    const allowed = ['title','category','city','notes','status','is_favorite','visited_at'];
+    const allowed = ['title','category','city','notes','status','is_favorite','visited_at','cover_url','latitude','longitude'];
     const patch = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.includes(k)));
     if (patch.title !== undefined) patch.title = patch.title || place.title;
     if (fields.status === 'visited' && place.status !== 'visited' && !('visited_at' in patch)) patch.visited_at = new Date().toISOString();
@@ -433,5 +442,5 @@ export default function App() {
   if (error && !profile) return <div className="error-page"><Brand/><div className="alert alert--error">{error}</div><button className="btn btn-primary" onClick={refreshScope}>Try again</button><button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Sign out</button></div>;
   if (!profile) return <Loader label="Opening our little space..."/>;
   if (!pair) return <PairSetup onCreated={setupPair} busy={busy} error={error}/>;
-  return <><Dashboard user={session.user} profile={profile} pair={pair} members={members} places={places} memories={memories} onSaveMemory={saveMemory} onDeleteMemory={deleteMemory} onAdd={addPlace} onEdit={editPlace} onRemove={removePlace} onSignOut={() => supabase.auth.signOut()} onRefresh={loadPlaces} notice={notice}/><Toast message={notice} close={() => setNotice('')}/></>;
+  return <><Dashboard user={session.user} profile={profile} pair={pair} members={members} places={places} memories={memories} photos={photos} onPhotosChange={loadPhotos} onDriveConnected={refreshScope} onSaveMemory={saveMemory} onDeleteMemory={deleteMemory} onAdd={addPlace} onEdit={editPlace} onRemove={removePlace} onSignOut={() => supabase.auth.signOut()} onRefresh={loadPlaces} notice={notice}/><Toast message={notice} close={() => setNotice('')}/></>;
 }
