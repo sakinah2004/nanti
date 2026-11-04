@@ -6,7 +6,8 @@ import {
   ShieldCheck, Shuffle, Sparkles, Trash2, UsersRound, WandSparkles, X
 } from 'lucide-react';
 import { supabase, isConfigured, CATEGORIES, normalizeUrl, getSource, placeholderTitle, localDate } from './lib';
-import Memories from './Memories';
+import Memories,{MemoryForm} from './Memories';
+import {coordinatesFromLink,guessMapTitle,todayLocalISO,getCurrentCoordinates} from './location';
 import OurMap from './OurMap';
 import './extraFeatures.css';
 
@@ -124,7 +125,7 @@ function FormModal({ initial, onClose, onSave, busy }) {
   const editing = !!initial?.id;
   const [url, setUrl] = useState(initial?.source_url || '');
   const [title, setTitle] = useState(initial?.title || '');
-  const [category, setCategory] = useState(initial?.category || 'Cafe');
+  const [category, setCategory] = useState(initial?.category || 'Other');
   const [city, setCity] = useState(initial?.city || '');
   const [notes, setNotes] = useState(initial?.notes || '');
   const [status, setStatus] = useState(initial?.status || 'want');
@@ -132,13 +133,18 @@ function FormModal({ initial, onClose, onSave, busy }) {
   const [latitude,setLatitude] = useState(initial?.latitude ?? '');
   const [longitude,setLongitude] = useState(initial?.longitude ?? '');
   const [previewStatus,setPreviewStatus] = useState('');
+  const [advanced,setAdvanced]=useState(editing);
+  const [locating,setLocating]=useState(false);
+  const pasteLink=async()=>{try{const text=await navigator.clipboard.readText();const match=text.match(/https?:\/\/[^\s]+/);setUrl((match?.[0]||text).trim());setError('');}catch{setError('Tempel link secara manual di kolom atas.');}};
+  const useLocation=async()=>{setLocating(true);setError('');try{const point=await getCurrentCoordinates();setLatitude(point.latitude);setLongitude(point.longitude);setPreviewStatus('Lokasi saat ini siap disimpan ♡');}catch(e){setError(e.message);}finally{setLocating(false);}};
   const tryCover = async () => {
     if (cover || !url.startsWith('https://') || !supabase) return;
     setPreviewStatus('Looking for a cover…');
     try {
       const {data,error} = await supabase.functions.invoke('place-preview',{body:{url}});
       if(error) throw error;
-      if(data?.cover_url) {setCover(data.cover_url);setPreviewStatus('Video cover found ♡');}
+      if(data?.cover_url) {setCover(data.cover_url);setPreviewStatus('Cover video ditemukan ♡');}
+      if(data?.title && !title && !editing) setTitle(data.title.slice(0,160));
       else setPreviewStatus('No automatic cover available. You can paste a cover URL below.');
     } catch{setPreviewStatus('Preview unavailable. You can paste a cover URL manually.');}
   };
@@ -149,26 +155,38 @@ function FormModal({ initial, onClose, onSave, busy }) {
     try {
       if (!editing) normalizeUrl(url);
       if(cover && (!/^https:\/\//i.test(cover)||cover.length>1800))throw new Error('Cover image harus link HTTPS yang valid.');
-      const lat=latitude===''?null:Number(latitude),lon=longitude===''?null:Number(longitude);
+      const fromLink=editing?null:coordinatesFromLink(url);
+      const lat=latitude===''?(fromLink?.latitude??null):Number(latitude),lon=longitude===''?(fromLink?.longitude??null):Number(longitude);
       if((lat===null)!==(lon===null) || (lat!==null&&(!Number.isFinite(lat)||Math.abs(lat)>90))||(lon!==null&&(!Number.isFinite(lon)||Math.abs(lon)>180)))throw new Error('Isi latitude dan longitude yang valid, atau kosongkan keduanya.');
-      await onSave({ url, title: title.trim(), category, city: city.trim(), notes: notes.trim(), status, cover_url:cover||null,latitude:lat,longitude:lon }, initial);
+      await onSave({ url, title: title.trim() || guessMapTitle(url), category, city: city.trim(), notes: notes.trim(), status, cover_url:cover||null,latitude:lat,longitude:lon }, initial);
       onClose();
     } catch(err) { setError(err.message || 'Gagal menyimpan.'); }
   };
   return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && onClose()}>
     <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div className="modal-top"><div><span className="eyebrow text-pink">LITTLE ADVENTURES</span><h2 id="modal-title">{editing ? 'Edit this place' : 'Save a new place'} <span>♡</span></h2></div><button aria-label="Close" className="icon-button" onClick={onClose}><X size={20}/></button></div>
-      <form className="place-form" onSubmit={submit}>
-        <label>Social media / Google Maps link <span className="required">*</span><div className="input-icon"><LinkIcon size={17}/><input type="url" placeholder="https://www.instagram.com/reel/..." required disabled={editing} value={url} onChange={e => setUrl(e.target.value)} onBlur={tryCover} /></div></label>
-        <label>Nama tempat <span className="sub-label">(kalau belum tahu, boleh kosong)</span><input maxLength={160} placeholder="Misalnya: Hidden café in Bandung" value={title} onChange={e => setTitle(e.target.value)} /></label>
-        <label>Cover image (auto-detect dari TikTok jika tersedia)<input type="url" maxLength={1800} placeholder="https://...image.jpg" value={cover} onChange={e=>setCover(e.target.value)}/>{previewStatus && <small className="muted">{previewStatus}</small>}{cover && <img className="form-cover-preview" src={cover} alt="Cover preview" referrerPolicy="no-referrer" onError={e=>e.currentTarget.style.display='none'}/>}</label>
-        <label>Category<div className="category-choices">{CATEGORIES.map(c => <button className={category === c.value ? 'selected' : ''} type="button" key={c.value} onClick={() => setCategory(c.value)}><span>{c.emoji}</span>{c.label}</button>)}</div></label>
-        <label>Area / kota<input maxLength={100} placeholder="Misalnya: Jakarta Selatan" value={city} onChange={e => setCity(e.target.value)} /></label>
-        <div className="place-coordinate-row"><label>Latitude (untuk Our Map)<input type="number" step="any" min="-90" max="90" placeholder="-6.2088" value={latitude} onChange={e=>setLatitude(e.target.value)}/></label><label>Longitude<input type="number" step="any" min="-180" max="180" placeholder="106.8456" value={longitude} onChange={e=>setLongitude(e.target.value)}/></label></div><small className="muted">Salin koordinat dari Google Maps. Kedua kolom opsional.</small>
-        <label>Catatan pribadi<textarea rows={3} maxLength={2000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Kenapa pengen ke sini? Apa yang mau dicoba?" /></label>
-        <label>Status<select value={status} onChange={e => setStatus(e.target.value)}><option value="want">♡ Want to go</option><option value="visited">✓ Visited</option></select></label>
+      <form className="place-form quick-place-form" onSubmit={submit}>
+        <label>Link TikTok, Instagram, atau Google Maps <span className="required">*</span>
+          <div className="input-icon"><LinkIcon size={17}/><input type="url" autoFocus placeholder="Tempel link tempat di sini…" required disabled={editing} value={url} onChange={e=>setUrl(e.target.value)} onBlur={tryCover}/></div>
+        </label>
+        {!editing && <button type="button" className="quick-paste" onClick={pasteLink}>📋 Paste link from clipboard</button>}
+        {!editing && <p className="quick-place-hint">Cukup tempel link dan simpan. Cover akan dicari otomatis jika tersedia.</p>}
+        <button type="button" className="memory-more-toggle" aria-expanded={advanced} onClick={()=>setAdvanced(v=>!v)}>{advanced?'− Tutup detail':'+ Tambahkan nama / lokasi (opsional)'}</button>
+        {advanced && <div className="quick-place-extras">
+          <label>Nama tempat<input maxLength={160} placeholder="Misalnya: hidden café di Bandung" value={title} onChange={e=>setTitle(e.target.value)}/></label>
+          <label>Kategori
+            <div className="category-choices">{CATEGORIES.map(c=><button className={category===c.value?'selected':''} type="button" key={c.value} onClick={()=>setCategory(c.value)}><span>{c.emoji}</span>{c.label}</button>)}</div>
+          </label>
+          <label>Kota / area<input maxLength={100} placeholder="Misalnya: Jakarta Selatan" value={city} onChange={e=>setCity(e.target.value)}/></label>
+          <label>Cover (jika tidak muncul otomatis)<input type="url" maxLength={1800} placeholder="https://...gambar.jpg" value={cover} onChange={e=>setCover(e.target.value)}/>{cover&&<img className="form-cover-preview" src={cover} alt="Cover tempat" referrerPolicy="no-referrer" onError={e=>{e.currentTarget.style.display='none'}}/>}</label>
+          <div className="quick-location"><button type="button" className="btn btn-ghost" disabled={locating} onClick={useLocation}>📍 {locating?'Mengambil lokasi…':'Gunakan lokasi saya saat ini'}</button><small>Hanya jika kamu sedang berada di tempat ini. Tidak melacak lokasi terus-menerus.</small></div>
+          <div className="place-coordinate-row"><label>Latitude<input type="number" step="any" min="-90" max="90" value={latitude} onChange={e=>setLatitude(e.target.value)}/></label><label>Longitude<input type="number" step="any" min="-180" max="180" value={longitude} onChange={e=>setLongitude(e.target.value)}/></label></div>
+          <label>Catatan pribadi<textarea rows={2} maxLength={2000} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Kenapa ingin ke sini?"/></label>
+          {editing && <label>Status<select value={status} onChange={e=>setStatus(e.target.value)}><option value="want">♡ Want to go</option><option value="visited">✓ Visited</option></select></label>}
+          {previewStatus && <p className="muted">{previewStatus}</p>}
+        </div>}
         {error && <div className="alert alert--error">{error}</div>}
-        <div className="modal-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button disabled={busy} className="btn btn-primary" type="submit">{busy ? 'Saving...' : 'Save place'} <Heart size={16}/></button></div>
+        <div className="modal-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button disabled={busy} className="btn btn-primary" type="submit">{busy ? 'Saving...' : editing?'Save changes':'Save to NANTI ♡'} <Heart size={16}/></button></div>
       </form>
     </div>
   </div>;
