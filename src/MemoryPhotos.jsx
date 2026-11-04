@@ -1,9 +1,9 @@
 import React,{useEffect,useState} from 'react';
 import { ImagePlus } from 'lucide-react';
 import {supabase} from './lib';
-import {connectDrive,driveConfigured,driveConnected,uploadDrivePhoto,downloadDrivePhoto} from './googleDrive';
+import {connectDrive,driveConfigured,driveConnected,preloadDriveLogin,uploadDrivePhoto,downloadDrivePhoto} from './googleDrive';
 
-function GooglePhoto({photo,connected}) {
+function GooglePhoto({photo,connected,revision}) {
   const [blob,setBlob]=useState(null),[error,setError]=useState('');
   useEffect(()=>{
     if(!connected)return;
@@ -11,7 +11,7 @@ function GooglePhoto({photo,connected}) {
     downloadDrivePhoto(photo.drive_file_id).then(url=>{objectUrl=url;if(active)setBlob(url);else URL.revokeObjectURL(url)})
       .catch(e=>{if(active)setError(e.message)});
     return ()=>{active=false;if(objectUrl)URL.revokeObjectURL(objectUrl)};
-  },[photo.drive_file_id,connected]);
+  },[photo.drive_file_id,connected,revision]);
   return <div className="memory-photo-tile">
     {blob?<img src={blob} alt={photo.file_name} loading="lazy"/>:<div className="memory-photo-placeholder">{error?'Photo unavailable':connected?'Loading photo…':'Connect Drive to view photo'}</div>}
     <a target="_blank" rel="noopener noreferrer" href={'https://drive.google.com/file/d/'+encodeURIComponent(photo.drive_file_id)+'/view'}>View in Drive ↗</a>
@@ -21,12 +21,14 @@ function GooglePhoto({photo,connected}) {
 export function useDriveConnection(onProfileChange){
   const [connected,setConnected]=useState(driveConnected());
   const [account,setAccount]=useState('');
+  const [revision,setRevision]=useState(0);
+  useEffect(()=>{preloadDriveLogin();},[]);
   const [error,setError]=useState('');
   async function connect(){
-    try{setError('');const email=await connectDrive();setAccount(email);setConnected(true);await onProfileChange?.();}
+    try{setError('');const email=await connectDrive();setAccount(email);setConnected(true);setRevision(v=>v+1);await onProfileChange?.();}
     catch(e){setError(e.message);}
   }
-  return {connected,account,error,connect};
+  return {connected,account,error,connect,revision};
 }
 
 export function DriveConnect({drive}) {
@@ -63,7 +65,7 @@ export function MemoryPhotoAlbum({memory,photos,drive,partner,onUploaded}) {
     finally{setBusy(false);}
   }
   return <section className="memory-photo-album">
-    {filtered.length>0&&<div className="memory-photo-grid">{filtered.map(photo=><GooglePhoto key={photo.id} photo={photo} connected={drive.connected}/>)}</div>}
+    {filtered.length>0&&<div className="memory-photo-grid">{filtered.map(photo=><GooglePhoto key={photo.id} photo={photo} connected={drive.connected} revision={drive.revision}/>)}</div>}
     <label className={'memory-upload '+(busy?'disabled':'')}>
       <ImagePlus size={16}/>{busy?'Uploading to Drive…':'Add photos ('+filtered.length+'/5)'}
       <input type="file" accept="image/*" multiple disabled={!drive.connected||busy||filtered.length>=5} onChange={upload} />
