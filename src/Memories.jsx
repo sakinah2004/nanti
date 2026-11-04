@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './memories.css';
+import MemoryCalendar from './MemoryCalendar';
+import {DriveConnect,MemoryPhotoAlbum,useDriveConnection} from './MemoryPhotos';
 import { ArrowLeft, CalendarDays, ExternalLink, Heart, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 export const MEMORY_MOODS = [
@@ -79,11 +81,11 @@ function MemoryForm({ initial, places, onSave, onClose }) {
           <textarea rows={4} maxLength={4000} value={story} onChange={e => setStory(e.target.value)}
             placeholder="What made this day special?"/>
         </label>
-        <label>Link foto Google Drive <span className="sub-label">(opsional, maks. 5; satu link per baris)</span>
+        <label>Link foto Google Drive lama <span className="sub-label">(opsional, satu link per baris)</span>
           <textarea rows={3} value={links} onChange={e => setLinks(e.target.value)}
             placeholder={'https://drive.google.com/file/d/.../view\nhttps://drive.google.com/file/d/.../view'}/>
         </label>
-        <p className="drive-hint"><ImagePlus size={16}/> Upload foto langsung ke folder Google Drive pribadi kalian, lalu tempel tautan berbagi di sini. Link tetap mengikuti izin Google Drive; aplikasi tidak mengunggah atau mempublikasikan foto.</p>
+        <p className="drive-hint"><ImagePlus size={16}/> Simpan memory terlebih dahulu, lalu tambahkan foto langsung di kartunya melalui tombol Add photos. File akan dikirim ke Google Drive, tidak ke Supabase Storage.</p>
         {error && <div className="alert alert--error">{error}</div>}
         <div className="modal-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button type="submit" disabled={busy} className="btn btn-primary">{busy ? 'Saving...' : 'Save memory'} <Heart size={16}/></button></div>
@@ -92,10 +94,13 @@ function MemoryForm({ initial, places, onSave, onClose }) {
   </div>;
 }
 
-export default function Memories({ memories, places, onSave, onDelete, onBack, isDemo = false }) {
+export default function Memories({ memories, places, photos = [], onPhotosChange, onDriveConnected, user, members = [], onSave, onDelete, onBack, isDemo = false }) {
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState('');
   const [moodFilter, setMoodFilter] = useState('All');
+  const [tab, setTab] = useState('gallery');
+  const drive = useDriveConnection(onDriveConnected);
+  const partner = members.find(m=>m.id!==user?.id);
   const sorted = useMemo(() => memories.filter(m => moodFilter === 'All' || m.mood === moodFilter)
     .slice().sort((a, b) => b.memory_date.localeCompare(a.memory_date)), [memories, moodFilter]);
   const dateLabel = value => value ? new Date(value + 'T12:00:00').toLocaleDateString('id-ID',
@@ -117,14 +122,17 @@ export default function Memories({ memories, places, onSave, onDelete, onBack, i
     </section>
     {isDemo && <div className="alert alert--error">Mode preview: kenangan tidak tersimpan online.</div>}
     {error && <div className="alert alert--error">{error}</div>}
-    <div className="memory-filters">
+    {!isDemo && <DriveConnect drive={drive}/>}
+    <div className="memories-tabs"><button className={tab==='gallery'?'selected':''} onClick={()=>setTab('gallery')}>♡ Gallery</button><button className={tab==='calendar'?'selected':''} onClick={()=>setTab('calendar')}>▦ Calendar</button></div>
+    {tab==='calendar' && <MemoryCalendar memories={memories} places={places} onSelect={mem=>{setTab('gallery');setMoodFilter('All');document.getElementById('memory-'+mem.id)?.scrollIntoView({behavior:'smooth'});}}/>}
+    {tab==='gallery' && <><div className="memory-filters">
       <button className={moodFilter === 'All' ? 'selected' : ''} onClick={() => setMoodFilter('All')}>All moods</button>
       {MEMORY_MOODS.map(m => <button key={m.value} className={moodFilter === m.value ? 'selected' : ''} onClick={() => setMoodFilter(m.value)}>{m.emoji} {m.value}</button>)}
     </div>
     {sorted.length ? <div className="memories-grid">{sorted.map(memory => {
       const mood = MEMORY_MOODS.find(m => m.value === memory.mood) || MEMORY_MOODS[1];
       const place = places.find(p => p.id === memory.place_id);
-      return <article className="memory-card" key={memory.id}>
+      return <article id={'memory-'+memory.id} className="memory-card" key={memory.id}>
         <div className="memory-art"><div className="memory-stamp">♡ our little days</div><span className="memory-emoji">{mood.emoji}</span></div>
         <div className="memory-body">
           <span className="memory-date"><CalendarDays size={14}/> {dateLabel(memory.memory_date)}</span>
@@ -136,6 +144,7 @@ export default function Memories({ memories, places, onSave, onDelete, onBack, i
             {memory.drive_links.map((url, i) => <a key={i} href={url} target="_blank" rel="noopener noreferrer">
               <ImagePlus size={14}/> Photo {i + 1} <ExternalLink size={12}/></a>)}
           </div>}
+          {!isDemo && <MemoryPhotoAlbum memory={memory} photos={photos} drive={drive} partner={partner} onUploaded={onPhotosChange}/>}
           <div className="memory-actions"><button onClick={() => setEditing(memory)}><Pencil size={15}/> Edit</button>
             <button onClick={() => remove(memory)}><Trash2 size={15}/> Delete</button></div>
         </div>
@@ -143,7 +152,7 @@ export default function Memories({ memories, places, onSave, onDelete, onBack, i
     })}</div> : <div className="empty-state"><div className="empty-icon">♡</div>
       <h3>{memories.length ? 'No memories in this mood.' : 'The best days are yet to come.'}</h3>
       <p>{memories.length ? 'Pilih mood lain untuk melihat kenangan.' : 'Mulai album kenangan pertama kalian di sini.'}</p>
-      <button className="btn btn-primary" onClick={() => setEditing({})}><Plus size={16}/> Add our first memory</button></div>}
+      <button className="btn btn-primary" onClick={() => setEditing({})}><Plus size={16}/> Add our first memory</button></div>}</>}
     {editing && <MemoryForm initial={editing} places={places} onSave={onSave} onClose={() => setEditing(null)}/>}
   </main>;
 }
