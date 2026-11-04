@@ -118,7 +118,7 @@ export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, o
   </div>;
 }
 
-export default function Memories({ memories, places, photos = [], onPhotosChange, onDriveConnected, user, members = [], onSave, onDelete, onBack, isDemo = false }) {
+export default function Memories({ memories, places, photos = [], onPhotosChange, onDriveConnected, onUpdatePlace, user, members = [], onSave, onDelete, onBack, isDemo = false }) {
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState('');
   const [moodFilter, setMoodFilter] = useState('All');
@@ -179,6 +179,6 @@ export default function Memories({ memories, places, photos = [], onPhotosChange
       <h3>{memories.length ? 'No memories in this mood.' : 'The best days are yet to come.'}</h3>
       <p>{memories.length ? 'Pilih mood lain untuk melihat kenangan.' : 'Mulai album kenangan pertama kalian di sini.'}</p>
       <button className="btn btn-primary" onClick={() => setEditing({})}><Plus size={16}/> Add our first memory</button></div>}</>}
-    {editing && <MemoryForm initial={editing} places={places} onSave={onSave} onClose={() => setEditing(null)} onPhotosChange={onPhotosChange} onDriveConnected={onDriveConnected} members={members} user={user} photos={photos} isDemo={isDemo} onPartialError={setError}/>}
+    {editing && <MemoryForm initial={editing} places={places} onSave={onSave} onClose={() => setEditing(null)} onPhotosChange={onPhotosChange} onDriveConnected={onDriveConnected} members={members} user={user} photos={photos} isDemo={isDemo} onPartialError={setError} onUpdatePlace={onUpdatePlace}/>}
   </main>;
 }
