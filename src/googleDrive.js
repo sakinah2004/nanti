@@ -7,6 +7,7 @@ const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.goog
 let tokenCache = null, expiryTime = 0, pendingScript = null;
 
 export function driveConfigured() { return Boolean(CLIENT_ID); }
+export function preloadDriveLogin() { if(CLIENT_ID) loadGIS().catch(()=>{}); }
 export function driveConnected() { return Boolean(tokenCache && Date.now() < expiryTime - 60000); }
 
 function loadGIS() {
