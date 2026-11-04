@@ -3,7 +3,7 @@ import './memories.css';
 import MemoryCalendar from './MemoryCalendar';
 import {DriveConnect,MemoryPhotoAlbum,useDriveConnection,savePhotosToMemory} from './MemoryPhotos';
 import {driveConfigured} from './googleDrive';
-import {todayLocalISO} from './location';
+import {todayLocalISO,getCurrentCoordinates} from './location';
 import { ArrowLeft, CalendarDays, ExternalLink, Heart, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 export const MEMORY_MOODS = [
@@ -12,7 +12,7 @@ export const MEMORY_MOODS = [
   { value: 'Peaceful', emoji: '🌿' }, { value: 'Unexpected', emoji: '😅' }
 ];
 
-export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, onDriveConnected, members = [], user, photos = [], isDemo = false, onPartialError }) {
+export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, onDriveConnected, members = [], user, photos = [], isDemo = false, onPartialError, onUpdatePlace }) {
   const [title, setTitle] = useState(initial?.title || 'Our little day ♡');
   const [memoryDate, setMemoryDate] = useState(initial?.memory_date || todayLocalISO());
   const [mood, setMood] = useState(initial?.mood || 'Happy');
@@ -21,9 +21,19 @@ export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, o
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [files,setFiles] = useState([]);
+  const [locationStatus,setLocationStatus] = useState('');
+  const [locating,setLocating] = useState(false);
   const drive=useDriveConnection(onDriveConnected);
   const partner=members.find(m=>m.id!==user?.id);
+  const chosenPlace=places.find(p=>p.id===placeId);
   const [showMore,setShowMore]=useState(Boolean(initial?.id));
+  async function saveHere(){
+    if(!chosenPlace||!onUpdatePlace)return;
+    setLocating(true);setLocationStatus('');
+    try{const point=await getCurrentCoordinates();await onUpdatePlace(chosenPlace,point);setLocationStatus('Titik lokasi tersimpan di Our Map ♡');}
+    catch(e){setLocationStatus(e.message||'Lokasi tidak tersedia.');}
+    finally{setLocating(false);}
+  }
 
   useEffect(() => {
     const onKey = event => { if (event.key === 'Escape') onClose(); };
@@ -81,6 +91,7 @@ export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, o
             <input type="file" accept="image/*" multiple onChange={e=>setFiles(Array.from(e.target.files||[]).slice(0,5))}/>
             <small>{files.length?files.map(f=>f.name).join(', '):'Maksimal 5 foto · langsung ke Google Drive'}</small>
           </label> : <p className="memory-photo-info">📸 Foto akan tersedia setelah Google Drive diaktifkan. Kenangan bisa disimpan sekarang.</p>}
+        {chosenPlace && !Number.isFinite(chosenPlace.latitude) && onUpdatePlace && <div className="memory-location-cta"><button type="button" disabled={locating} onClick={saveHere}>📍 {locating?'Menyimpan lokasi…':'I’m here — mark on Our Map'}</button><small>Opsional, hanya jika kalian sedang di tempat ini.</small>{locationStatus&&<small>{locationStatus}</small>}</div>}
         <button type="button" className="memory-more-toggle" aria-expanded={showMore} onClick={()=>setShowMore(v=>!v)}>{showMore?'− Tutup detail':'+ Tambah cerita / ubah tanggal (opsional)'}</button>
         {showMore && <div className="memory-extra-fields">
           <label>Judul kenangan
