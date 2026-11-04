@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './memories.css';
 import MemoryCalendar from './MemoryCalendar';
-import {DriveConnect,MemoryPhotoAlbum,useDriveConnection} from './MemoryPhotos';
+import {DriveConnect,MemoryPhotoAlbum,useDriveConnection,savePhotosToMemory} from './MemoryPhotos';
+import {driveConfigured} from './googleDrive';
+import {todayLocalISO} from './location';
 import { ArrowLeft, CalendarDays, ExternalLink, Heart, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 export const MEMORY_MOODS = [
@@ -10,14 +12,18 @@ export const MEMORY_MOODS = [
   { value: 'Peaceful', emoji: '🌿' }, { value: 'Unexpected', emoji: '😅' }
 ];
 
-function MemoryForm({ initial, places, onSave, onClose }) {
+export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, onDriveConnected, members = [], user, isDemo = false, onPartialError }) {
   const [title, setTitle] = useState(initial?.title || '');
-  const [memoryDate, setMemoryDate] = useState(initial?.memory_date || new Date().toLocaleDateString('en-CA'));
+  const [memoryDate, setMemoryDate] = useState(initial?.memory_date || todayLocalISO());
   const [mood, setMood] = useState(initial?.mood || 'Happy');
   const [story, setStory] = useState(initial?.story || '');
   const [placeId, setPlaceId] = useState(initial?.place_id || '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [files,setFiles] = useState([]);
+  const drive=useDriveConnection(onDriveConnected);
+  const partner=members.find(m=>m.id!==user?.id);
+  const [showMore,setShowMore]=useState(Boolean(initial?.id));
 
   useEffect(() => {
     const onKey = event => { if (event.key === 'Escape') onClose(); };
@@ -28,16 +34,27 @@ function MemoryForm({ initial, places, onSave, onClose }) {
   async function submit(event) {
     event.preventDefault();
     setError('');
+    if(files.length && !driveConfigured() && !isDemo) return setError('Upload foto belum diaktifkan. Hapus pilihan foto untuk menyimpan kenangan tanpa foto.');
+    if(files.length && !isDemo && !drive.connected) return setError('Hubungkan Google Drive satu kali untuk menyimpan foto.');
+    if(files.length && !isDemo && !partner?.google_drive_email) return setError('Pasangan perlu menghubungkan akun Google Drive satu kali sebelum foto dapat dibagikan secara privat.');
     try {
       if (!title.trim() || title.trim().length > 120) throw new Error('Judul harus 1–120 karakter.');
       if (story.length > 4000) throw new Error('Cerita maksimal 4.000 karakter.');
       setBusy(true);
-      await onSave({
-        title: title.trim(), memory_date: memoryDate, mood, story: story.trim(),
-        place_id: placeId || null
-      }, initial);
+      const saved=await onSave({
+        title:title.trim(),memory_date:memoryDate,mood,story:story.trim(),place_id:placeId||null
+      },initial);
+      if(files.length && !isDemo) {
+        try {
+          await savePhotosToMemory(saved,files,partner.google_drive_email);
+          await onPhotosChange?.();
+        } catch(photoError) {
+          await onPhotosChange?.().catch(()=>{});
+          onPartialError?.('Kenangan sudah tersimpan, tetapi ada foto yang gagal diunggah. Tambahkan lagi dari Gallery. '+photoError.message);
+        }
+      }
       onClose();
-    } catch (e) {
+    } catch(e) {
       setError(e.message || 'Kenangan belum berhasil disimpan.');
     } finally { setBusy(false); }
   }
@@ -48,34 +65,42 @@ function MemoryForm({ initial, places, onSave, onClose }) {
         <div><span className="eyebrow text-pink">OUR LITTLE DAYS</span><h2 id="memory-title">{initial?.id ? 'Edit memory' : 'A new memory'} ♡</h2></div>
         <button className="icon-button" onClick={onClose} aria-label="Close"><X size={20}/></button>
       </div>
-      <form className="place-form" onSubmit={submit}>
-        <label>Judul kenangan <span className="required">*</span>
-          <input required maxLength={120} value={title} onChange={e => setTitle(e.target.value)} placeholder="A slow Sunday together"/>
-        </label>
-        <label>Tanggal <span className="required">*</span>
-          <input type="date" required value={memoryDate} onChange={e => setMemoryDate(e.target.value)} />
-        </label>
-        <div className="memory-label">How was our date? <span className="sub-label">Pilih satu mood</span></div>
+      <form className="place-form memory-quick-form" onSubmit={submit}>
+        {initial?.place_id && <div className="memory-place-summary">📍 {places.find(p=>p.id===initial.place_id)?.title || 'Our date'} <small>· {new Date(memoryDate+'T12:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</small></div>}
+        <div className="memory-label">How was our date? <span className="sub-label">Pilih mood ♡</span></div>
         <div className="mood-grid" role="group" aria-label="Date mood">
           {MEMORY_MOODS.map(option => <button type="button" aria-pressed={mood === option.value} key={option.value}
-            onClick={() => setMood(option.value)} className={'mood-choice ' + (mood === option.value ? 'selected' : '')}>
+            onClick={() => setMood(option.value)} className={'mood-choice '+(mood===option.value?'selected':'')}>
             <span aria-hidden="true">{option.emoji}</span><small>{option.value}</small>
           </button>)}
         </div>
-        <label>Tempat dari wishlist (opsional)
-          <select value={placeId} onChange={e => setPlaceId(e.target.value)}>
-            <option value="">Kenangan spontan, tanpa tempat</option>
-            {places.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-          </select>
-        </label>
-        <label>Our little story
-          <textarea rows={4} maxLength={4000} value={story} onChange={e => setStory(e.target.value)}
-            placeholder="What made this day special?"/>
-        </label>
-        <p className="drive-hint"><ImagePlus size={16}/> Simpan kenangan dulu, lalu pilih Add photos langsung dari kartu Memory untuk upload foto ke Google Drive.</p>
+        {!isDemo && driveConfigured() && !drive.connected && <div className="memory-drive-setup"><span>📷 Hubungkan Google Drive satu kali untuk menyimpan foto pribadi.</span><button type="button" className="btn btn-ghost" onClick={drive.connect}>Connect Drive</button>{drive.error&&<small className="drive-error">{drive.error}</small>}</div>}
+        {isDemo ? <p className="memory-photo-info">Mode demo: upload foto belum tersedia.</p>:
+          driveConfigured() ? <label className="memory-file-picker">📸 Pilih foto dari galeri
+            <input type="file" accept="image/*" multiple onChange={e=>setFiles(Array.from(e.target.files||[]).slice(0,5))}/>
+            <small>{files.length?files.map(f=>f.name).join(', '):'Maksimal 5 foto · langsung ke Google Drive'}</small>
+          </label> : <p className="memory-photo-info">📸 Foto akan tersedia setelah Google Drive diaktifkan. Kenangan bisa disimpan sekarang.</p>}
+        <button type="button" className="memory-more-toggle" aria-expanded={showMore} onClick={()=>setShowMore(v=>!v)}>{showMore?'− Tutup detail':'+ Tambah cerita / ubah tanggal (opsional)'}</button>
+        {showMore && <div className="memory-extra-fields">
+          <label>Judul kenangan
+            <input required maxLength={120} value={title} onChange={e=>setTitle(e.target.value)} placeholder="A slow Sunday together"/>
+          </label>
+          <label>Tanggal
+            <input type="date" required value={memoryDate} onChange={e=>setMemoryDate(e.target.value)}/>
+          </label>
+          <label>Tempat
+            <select value={placeId} onChange={e=>setPlaceId(e.target.value)}>
+              <option value="">Kenangan spontan, tanpa tempat</option>
+              {places.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+          </label>
+          <label>Our little story
+            <textarea rows={3} maxLength={4000} value={story} onChange={e=>setStory(e.target.value)} placeholder="Tulis sesuatu kalau kamu mau…"/>
+          </label>
+        </div>}
         {error && <div className="alert alert--error">{error}</div>}
         <div className="modal-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={busy} className="btn btn-primary">{busy ? 'Saving...' : 'Save memory'} <Heart size={16}/></button></div>
+          <button type="submit" disabled={busy} className="btn btn-primary">{busy?'Saving…':'Save Memory ♡'} <Heart size={16}/></button></div>
       </form>
     </div>
   </div>;
@@ -142,6 +167,6 @@ export default function Memories({ memories, places, photos = [], onPhotosChange
       <h3>{memories.length ? 'No memories in this mood.' : 'The best days are yet to come.'}</h3>
       <p>{memories.length ? 'Pilih mood lain untuk melihat kenangan.' : 'Mulai album kenangan pertama kalian di sini.'}</p>
       <button className="btn btn-primary" onClick={() => setEditing({})}><Plus size={16}/> Add our first memory</button></div>}</>}
-    {editing && <MemoryForm initial={editing} places={places} onSave={onSave} onClose={() => setEditing(null)}/>}
+    {editing && <MemoryForm initial={editing} places={places} onSave={onSave} onClose={() => setEditing(null)} onPhotosChange={onPhotosChange} onDriveConnected={onDriveConnected} members={members} user={user} isDemo={isDemo} onPartialError={setError}/>}
   </main>;
 }
