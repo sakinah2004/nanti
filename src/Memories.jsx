@@ -13,7 +13,7 @@ export const MEMORY_MOODS = [
 ];
 
 export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, onDriveConnected, members = [], user, isDemo = false, onPartialError }) {
-  const [title, setTitle] = useState(initial?.title || '');
+  const [title, setTitle] = useState(initial?.title || 'Our little day ♡');
   const [memoryDate, setMemoryDate] = useState(initial?.memory_date || todayLocalISO());
   const [mood, setMood] = useState(initial?.mood || 'Happy');
   const [story, setStory] = useState(initial?.story || '');
@@ -49,7 +49,7 @@ export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, o
           await savePhotosToMemory(saved,files,partner.google_drive_email);
           await onPhotosChange?.();
         } catch(photoError) {
-          await onPhotosChange?.().catch(()=>{});
+          try { await onPhotosChange?.(); } catch {}
           onPartialError?.('Kenangan sudah tersimpan, tetapi ada foto yang gagal diunggah. Tambahkan lagi dari Gallery. '+photoError.message);
         }
       }
