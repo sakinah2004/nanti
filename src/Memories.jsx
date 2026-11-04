@@ -16,7 +16,6 @@ function MemoryForm({ initial, places, onSave, onClose }) {
   const [mood, setMood] = useState(initial?.mood || 'Happy');
   const [story, setStory] = useState(initial?.story || '');
   const [placeId, setPlaceId] = useState(initial?.place_id || '');
-  const [links, setLinks] = useState((initial?.drive_links || []).join('\n'));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -29,21 +28,13 @@ function MemoryForm({ initial, places, onSave, onClose }) {
   async function submit(event) {
     event.preventDefault();
     setError('');
-    const urls = links.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-    if (urls.length > 5) return setError('Maksimal lima link foto per kenangan.');
     try {
-      for (const link of urls) {
-        const url = new URL(link);
-        if (url.protocol !== 'https:' || url.hostname !== 'drive.google.com' || link.length > 1000) {
-          throw new Error('Gunakan link berbagi Google Drive (https://drive.google.com/...).');
-        }
-      }
       if (!title.trim() || title.trim().length > 120) throw new Error('Judul harus 1–120 karakter.');
       if (story.length > 4000) throw new Error('Cerita maksimal 4.000 karakter.');
       setBusy(true);
       await onSave({
         title: title.trim(), memory_date: memoryDate, mood, story: story.trim(),
-        place_id: placeId || null, drive_links: urls
+        place_id: placeId || null
       }, initial);
       onClose();
     } catch (e) {
@@ -81,11 +72,7 @@ function MemoryForm({ initial, places, onSave, onClose }) {
           <textarea rows={4} maxLength={4000} value={story} onChange={e => setStory(e.target.value)}
             placeholder="What made this day special?"/>
         </label>
-        <label>Link foto Google Drive lama <span className="sub-label">(opsional, satu link per baris)</span>
-          <textarea rows={3} value={links} onChange={e => setLinks(e.target.value)}
-            placeholder={'https://drive.google.com/file/d/.../view\nhttps://drive.google.com/file/d/.../view'}/>
-        </label>
-        <p className="drive-hint"><ImagePlus size={16}/> Simpan memory terlebih dahulu, lalu tambahkan foto langsung di kartunya melalui tombol Add photos. File akan dikirim ke Google Drive, tidak ke Supabase Storage.</p>
+        <p className="drive-hint"><ImagePlus size={16}/> Simpan kenangan dulu, lalu pilih Add photos langsung dari kartu Memory untuk upload foto ke Google Drive.</p>
         {error && <div className="alert alert--error">{error}</div>}
         <div className="modal-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button type="submit" disabled={busy} className="btn btn-primary">{busy ? 'Saving...' : 'Save memory'} <Heart size={16}/></button></div>
