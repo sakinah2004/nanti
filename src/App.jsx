@@ -144,8 +144,8 @@ function FormModal({ initial, onClose, onSave, busy }) {
       const {data,error} = await supabase.functions.invoke('place-preview',{body:{url}});
       if(error) throw error;
       if(data?.cover_url) {setCover(data.cover_url);setPreviewStatus('Cover video ditemukan ♡');}
+      else setPreviewStatus('Cover belum tersedia, tapi link tetap bisa disimpan.');
       if(data?.title && !title && !editing) setTitle(data.title.slice(0,160));
-      else setPreviewStatus('No automatic cover available. You can paste a cover URL below.');
     } catch{setPreviewStatus('Preview unavailable. You can paste a cover URL manually.');}
   };
   const [error, setError] = useState('');
@@ -238,7 +238,8 @@ function Dashboard({ user, profile, pair, members, places, memories, photos = []
     try {
       if(place.status !== 'visited') await onEdit(place,{status:'visited',visited_at:new Date().toISOString()});
       setView('visited');setCat('All');setQuery('');
-      setQuickMemory({place_id:place.id,title:('Our date at '+place.title).slice(0,120),memory_date:todayLocalISO(),mood:'Happy',story:''});
+      const date=place.status==='visited' && !memories.some(m=>m.place_id===place.id) && place.visited_at ? new Date(place.visited_at) : new Date();
+      setQuickMemory({place_id:place.id,title:('Our date at '+place.title).slice(0,120),memory_date:todayLocalISO(date),mood:'Happy',story:''});
       setToast('Date added ♡ Choose a mood to keep this memory.');
     } catch(e) {setToast(e.message);} finally {setBusy(false);}
   };
@@ -427,18 +428,21 @@ export default function App() {
     });
     if (addErr) { if (addErr.code === '23505') throw new Error('Link ini sudah ada di wishlist kalian ♡'); throw addErr; }
     await loadPlaces();
-    // TikTok thumbnails are best-effort; save the place immediately even if preview fails.
-    if (!fields.cover_url && /(?:tiktok\.com)/i.test(fields.url)) {
-      supabase.functions.invoke('place-preview',{body:{url:fields.url}})
-        .then(async ({data,error})=>{
-          if(!error && data?.cover_url){
-            const title=data.title && !(fields.title||guessMapTitle(fields.url))?data.title.slice(0,160):null;
-            const patch={cover_url:data.cover_url};if(title)patch.title=title;
-            const {error:coverErr}=await supabase.from('places').update(patch)
-              .eq('pair_id',pair.id).eq('canonical_url',canonical_url).is('cover_url',null);
-            if(!coverErr) await loadPlaces();
-          }
-        }).catch(()=>{});
+    // Best-effort metadata: do not block saving or overwrite later user edits.
+    if(!fields.cover_url && /(?:tiktok\.com)/i.test(fields.url)){
+      supabase.functions.invoke('place-preview',{body:{url:fields.url}}).then(async({data,error})=>{
+        if(error||!data)return;
+        const initialTitle=(fields.title||guessMapTitle(fields.url)||placeholderTitle(fields.url)).slice(0,160);
+        if(data.cover_url){
+          await supabase.from('places').update({cover_url:data.cover_url}).eq('pair_id',pair.id)
+            .eq('canonical_url',canonical_url).is('cover_url',null);
+        }
+        if(data.title && !fields.title){
+          await supabase.from('places').update({title:data.title.slice(0,160)}).eq('pair_id',pair.id)
+            .eq('canonical_url',canonical_url).eq('title',initialTitle);
+        }
+        await loadPlaces();
+      }).catch(()=>{});
     }
   }, [pair,uid,loadPlaces]);
   const editPlace = async (place, fields) => {
