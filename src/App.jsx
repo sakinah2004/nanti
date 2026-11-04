@@ -391,6 +391,17 @@ export default function App() {
     });
     if (addErr) { if (addErr.code === '23505') throw new Error('Link ini sudah ada di wishlist kalian ♡'); throw addErr; }
     await loadPlaces();
+    // TikTok thumbnails are best-effort; save the place immediately even if preview fails.
+    if (!fields.cover_url && /(?:tiktok\.com)/i.test(fields.url)) {
+      supabase.functions.invoke('place-preview',{body:{url:fields.url}})
+        .then(async ({data,error})=>{
+          if(!error && data?.cover_url){
+            const {error:coverErr}=await supabase.from('places').update({cover_url:data.cover_url})
+              .eq('pair_id',pair.id).eq('canonical_url',canonical_url).is('cover_url',null);
+            if(!coverErr) await loadPlaces();
+          }
+        }).catch(()=>{});
+    }
   }, [pair,uid,loadPlaces]);
   const editPlace = async (place, fields) => {
     // Kolom identitas (pair_id, saved_by, URL) tidak dapat diubah melalui frontend.
