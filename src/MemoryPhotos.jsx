@@ -35,8 +35,22 @@ export function DriveConnect({drive}) {
   return <div className="drive-panel"><div><b>📷 Photos in Google Drive</b><p>Photos uploaded from NANTI are kept private in your own Google Drive, not in Supabase Storage.</p>
     {drive.account&&<small>Connected as {drive.account}</small>}
     {drive.error&&<p className="drive-error">{drive.error}</p>}
-    {!driveConfigured()&&<p className="drive-error">Google Drive belum dikonfigurasi. Tambahkan VITE_GOOGLE_CLIENT_ID di Cloudflare Pages untuk mengaktifkan upload.</p>}
+    {!driveConfigured()&&<p className="drive-error">Upload foto belum aktif. Album dan kalender tetap bisa digunakan.</p>}
   </div><button className="btn btn-ghost" disabled={!driveConfigured()} onClick={drive.connect}>{drive.connected?'Reconnect Drive':'Connect Google Drive'}</button></div>;
+}
+
+export async function savePhotosToMemory(memory,files,partnerEmail) {
+  if (!memory?.id || !memory?.pair_id) throw new Error('Memory belum tersimpan.');
+  if (!partnerEmail) throw new Error('Akun Google pasangan perlu dihubungkan satu kali agar foto tetap privat.');
+  const {data:{user},error:authErr}=await supabase.auth.getUser();
+  if(authErr||!user)throw new Error('Silakan login ke NANTI terlebih dahulu.');
+  for(const file of files){
+    const uploaded=await uploadDrivePhoto(file,partnerEmail);
+    const {error:insertErr}=await supabase.from('memory_photos').insert({
+      ...uploaded,memory_id:memory.id,pair_id:memory.pair_id,uploaded_by:user.id
+    });
+    if(insertErr)throw new Error('Foto sudah diunggah, tetapi belum muncul di album. '+insertErr.message);
+  }
 }
 
 export function MemoryPhotoAlbum({memory,photos,drive,partner,onUploaded}) {
@@ -51,15 +65,7 @@ export function MemoryPhotoAlbum({memory,photos,drive,partner,onUploaded}) {
     if(!partner?.google_drive_email){setError('Pasangan perlu connect Google Drive juga sebelum upload agar foto bisa dilihat berdua.');return;}
     setBusy(true);setError('');
     try {
-      const {data:{user},error:authErr}=await supabase.auth.getUser();
-      if(authErr||!user)throw new Error('Silakan login terlebih dahulu.');
-      for(const file of files){
-        const uploaded=await uploadDrivePhoto(file,partner.google_drive_email);
-        const {error:insertErr}=await supabase.from('memory_photos').insert({
-          ...uploaded,memory_id:memory.id,pair_id:memory.pair_id,uploaded_by:user.id
-        });
-        if(insertErr)throw insertErr;
-      }
+      await savePhotosToMemory(memory,files,partner.google_drive_email);
       await onUploaded?.();
     }catch(e){setError(e.message||'Gagal mengunggah foto.');}
     finally{setBusy(false);}
