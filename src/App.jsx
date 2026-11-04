@@ -6,6 +6,7 @@ import {
   ShieldCheck, Shuffle, Sparkles, Trash2, UsersRound, WandSparkles, X
 } from 'lucide-react';
 import { supabase, isConfigured, CATEGORIES, normalizeUrl, getSource, placeholderTitle, localDate } from './lib';
+import Memories from './Memories';
 
 const defaultDemoPlaces = [
   { id: 'd1', title: 'Little coffee corner', category: 'Cafe', city: 'Jakarta Selatan', status: 'want', is_favorite: true, notes: 'Cozy banget, coba weekend!', saved_by: 'demo-you', source_url: 'https://www.instagram.com/', created_at: '2026-10-29T10:00:00Z' },
@@ -171,8 +172,9 @@ function PlaceCard({ place, memberName, onEdit, onToggleFavorite, onToggleVisite
   </article>;
 }
 
-function Dashboard({ user, profile, pair, members, places, onAdd, onEdit, onRemove, onSignOut, onRefresh, isDemo = false, notice = '' }) {
+function Dashboard({ user, profile, pair, members, places, memories, onAdd, onEdit, onRemove, onSaveMemory, onDeleteMemory, onSignOut, onRefresh, isDemo = false, notice = '' }) {
   const [view, setView] = useState('want');
+  const [section, setSection] = useState('places');
   const [cat, setCat] = useState('All');
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState(null);
@@ -205,13 +207,14 @@ function Dashboard({ user, profile, pair, members, places, onAdd, onEdit, onRemo
     setToast('Backup CSV downloaded ♡');
   };
   const copy = async value => { try { await navigator.clipboard.writeText(value); setToast('Copied to clipboard ♡'); } catch { setToast('Gagal menyalin. Salin teks secara manual.'); } };
+  if (section === 'memories') return <div className="app-shell"><header className="site-header"><div className="header-inner"><Brand/><nav className="desktop-nav"><button className="nav-link" onClick={() => setSection('places')}>Our places</button><button className="nav-link active">Our memories ♡</button></nav><button className="header-new-btn" onClick={() => setSection('places')}>Our places</button></div></header><Memories memories={memories} places={places} onSave={onSaveMemory} onDelete={onDeleteMemory} onBack={() => setSection('places')} isDemo={isDemo}/></div>;
   return <div className="app-shell">
     {isDemo && <div className="demo-banner">✦ MODE PREVIEW — Data ini contoh dan tidak tersimpan online. Hubungkan Supabase untuk versi sungguhan. <a href="#setup-notes">Cara setup</a></div>}
-    <header className="site-header"><div className="header-inner"><Brand/><nav className="desktop-nav"><button className="nav-link active">Our places <span>♡</span></button><button className="nav-link" onClick={() => setShowInvite(true)}>Our space</button></nav><div className="header-actions"><div className="members-avatars" title="Just the two of you">{members.map((m,i) => <div key={m.id} className={`avatar avatar--${i}`}>{(m.display_name || '♡').charAt(0).toUpperCase()}</div>)}{members.length === 1 && <div className="avatar avatar--empty">+</div>}</div><button className="header-new-btn" onClick={() => setModal({})}><Plus size={17}/>Add a place</button><button onClick={() => setMobileMenu(!mobileMenu)} className="icon-button menu-btn" aria-label="Menu"><Menu size={22}/></button></div></div></header>
-    {mobileMenu && <div className="mobile-popover"><button onClick={() => { setShowInvite(true); setMobileMenu(false); }}><UsersRound size={17}/> Our space</button><button onClick={onSignOut}><LogOut size={17}/> Sign out</button></div>}
+    <header className="site-header"><div className="header-inner"><Brand/><nav className="desktop-nav"><button className="nav-link active">Our places <span>♡</span></button><button className="nav-link" onClick={() => setSection('memories')}>Our memories</button><button className="nav-link" onClick={() => setShowInvite(true)}>Our space</button></nav><div className="header-actions"><div className="members-avatars" title="Just the two of you">{members.map((m,i) => <div key={m.id} className={`avatar avatar--${i}`}>{(m.display_name || '♡').charAt(0).toUpperCase()}</div>)}{members.length === 1 && <div className="avatar avatar--empty">+</div>}</div><button className="header-new-btn" onClick={() => setModal({})}><Plus size={17}/>Add a place</button><button onClick={() => setMobileMenu(!mobileMenu)} className="icon-button menu-btn" aria-label="Menu"><Menu size={22}/></button></div></div></header>
+    {mobileMenu && <div className="mobile-popover"><button onClick={() => { setShowInvite(true); setMobileMenu(false); }}><UsersRound size={17}/> Our space</button><button onClick={() => { setSection('memories'); setMobileMenu(false); }}><Heart size={17}/> Our memories</button><button onClick={onSignOut}><LogOut size={17}/> Sign out</button></div>}
     <main className="main-container">
       <section className="hero">
-        <div className="hero-copy"><div className="hero-kicker"><span className="kicker-line"></span> OUR LITTLE CORNER OF THE INTERNET <span>✳</span></div><h1>Places to go.<br/><em>Memories to make.</em></h1><p>Every cute café, hidden gem, and spontaneous adventure — all in one place, just for us.</p><div className="hero-buttons"><button className="btn btn-dark" onClick={() => setModal({})}><Plus size={18}/> Save a new place</button><button className="btn btn-hero-outline" onClick={pickRandom}><Shuffle size={17}/> Pick our next date</button></div></div>
+        <div className="hero-copy"><div className="hero-kicker"><span className="kicker-line"></span> OUR LITTLE CORNER OF THE INTERNET <span>✳</span></div><h1>Places to go.<br/><em>Memories to make.</em></h1><p>Every cute café, hidden gem, and spontaneous adventure — all in one place, just for us.</p><div className="hero-buttons"><button className="btn btn-dark" onClick={() => setModal({})}><Plus size={18}/> Save a new place</button><button className="btn btn-hero-outline" onClick={pickRandom}><Shuffle size={17}/> Pick our next date</button><button className="btn btn-hero-outline" onClick={() => setSection('memories')}><Heart size={17}/> Our Memories</button></div></div>
         <div className="hero-graphic"><div className="hero-orbit hero-orbit--one"></div><div className="hero-orbit hero-orbit--two"></div><span className="graphic-sparkle gs-one">✦</span><span className="graphic-sparkle gs-two">✳</span><div className="hero-polaroid hero-polaroid--back"><span>🌿</span><small>an outdoor adventure</small></div><div className="hero-polaroid hero-polaroid--front"><span>☕</span><small>coffee with you ♡</small></div><div className="hero-ribbon">you + me + everywhere</div></div>
       </section>
       <section className="stats-grid" aria-label="Wishlist statistics"><button className={`stat ${view === 'want' ? 'stat--active' : ''}`} onClick={() => { setView('want'); setCat('All'); setQuery(''); }}><div className="stat-icon stat-icon--rose"><Bookmark size={20}/></div><div><div className="stat-number">{stats.want.toString().padStart(2,'0')}</div><div className="stat-label">Want to go</div></div><ArrowDownRight size={16} className="stat-arrow"/></button><button className={`stat ${view === 'visited' ? 'stat--active' : ''}`} onClick={() => { setView('visited'); setCat('All'); setQuery(''); }}><div className="stat-icon stat-icon--sage"><Check size={20}/></div><div><div className="stat-number">{stats.visited.toString().padStart(2,'0')}</div><div className="stat-label">We've been</div></div><ArrowDownRight size={16} className="stat-arrow"/></button><button className={`stat ${view === 'favorite' ? 'stat--active' : ''}`} onClick={() => { setView('favorite'); setCat('All'); setQuery(''); }}><div className="stat-icon stat-icon--peach"><Heart size={20}/></div><div><div className="stat-number">{stats.favorite.toString().padStart(2,'0')}</div><div className="stat-label">Our favorites</div></div><ArrowDownRight size={16} className="stat-arrow"/></button></section>
@@ -231,6 +234,7 @@ function Dashboard({ user, profile, pair, members, places, onAdd, onEdit, onRemo
 
 function DemoApp() {
   const [places, setPlaces] = useState(defaultDemoPlaces);
+  const [memories, setMemories] = useState([]);
   const [toast, setToast] = useState('');
   const add = async fields => {
     const canonical_url = normalizeUrl(fields.url);
@@ -239,7 +243,9 @@ function DemoApp() {
   };
   const edit = async (place, patch) => setPlaces(s => s.map(p => p.id === place.id ? { ...p, ...patch, title: patch.title || p.title } : p));
   const remove = async place => setPlaces(s => s.filter(p => p.id !== place.id));
-  return <><Dashboard user={{ id: 'demo-you' }} profile={{ display_name:'You' }} pair={{ invite_code: 'DEMO-CODE' }} members={[{ id:'demo-you', display_name:'You' },{ id:'demo-him', display_name:'Him' }]} places={places} onAdd={add} onEdit={edit} onRemove={remove} onSignOut={() => setToast('Mode preview: tidak ada akun untuk logout.')} isDemo/><div className="demo-instructions" id="setup-notes"><b>Mode preview</b> — Untuk menyimpan data online bersama pasangan, ikuti langkah di README.md dan isi variabel Supabase.</div><Toast message={toast} close={() => setToast('')}/></>;
+  const saveMemory = async (fields, existing) => setMemories(current => existing?.id ? current.map(m => m.id === existing.id ? { ...m, ...fields } : m) : [{ ...fields, id: crypto.randomUUID(), created_by: 'demo-you' }, ...current]);
+  const deleteMemory = async memory => setMemories(current => current.filter(m => m.id !== memory.id));
+  return <><Dashboard user={{ id: 'demo-you' }} profile={{ display_name:'You' }} pair={{ invite_code: 'DEMO-CODE' }} members={[{ id:'demo-you', display_name:'You' },{ id:'demo-him', display_name:'Him' }]} places={places} memories={memories} onSaveMemory={saveMemory} onDeleteMemory={deleteMemory} onAdd={add} onEdit={edit} onRemove={remove} onSignOut={() => setToast('Mode preview: tidak ada akun untuk logout.')} isDemo/><div className="demo-instructions" id="setup-notes"><b>Mode preview</b> — Untuk menyimpan data online bersama pasangan, ikuti langkah di README.md dan isi variabel Supabase.</div><Toast message={toast} close={() => setToast('')}/></>;
 }
 
 export default function App() {
@@ -249,6 +255,7 @@ export default function App() {
   const [pair, setPair] = useState(null);
   const [members, setMembers] = useState([]);
   const [places, setPlaces] = useState([]);
+  const [memories, setMemories] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -263,7 +270,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => { if (live) { setSession(data.session); setAuthReady(true); } }).catch(() => { if(live) setAuthReady(true); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, next) => {
       if(!live) return;
-      if(event === 'SIGNED_OUT') { setProfile(null); setPair(null); setMembers([]); setPlaces([]); }
+      if(event === 'SIGNED_OUT') { setProfile(null); setPair(null); setMembers([]); setPlaces([]); setMemories([]); }
       setSession(next); setAuthReady(true);
     });
     return () => { live = false; subscription.unsubscribe(); };
@@ -283,7 +290,7 @@ export default function App() {
         ]);
         if (pairErr) throw pairErr; if (memErr) throw memErr;
         setPair(pa); setMembers(mem || []);
-      } else { setPair(null); setMembers([]); setPlaces([]); }
+      } else { setPair(null); setMembers([]); setPlaces([]); setMemories([]); }
       setError('');
     } catch (e) { setError(e.message || 'Gagal memuat profil.'); }
     finally { setScopeLoading(false); }
@@ -307,6 +314,36 @@ export default function App() {
     window.addEventListener('focus', onFocus);
     return () => { clearInterval(t); window.removeEventListener('focus', onFocus); supabase.removeChannel(channel); };
   }, [pair?.id, loadPlaces, refreshScope]);
+
+  const loadMemories = useCallback(async () => {
+    if (!pair?.id) return;
+    const { data, error } = await supabase.from('memories').select('*').eq('pair_id', pair.id).order('memory_date', {ascending:false});
+    if (error) setNotice('Gagal memuat memories. Jalankan migration SQL Date Memories terlebih dahulu: ' + error.message);
+    else setMemories(data || []);
+  }, [pair?.id]);
+  useEffect(() => {
+    if (!pair?.id) return;
+    loadMemories();
+    const ch = supabase.channel('memories-' + pair.id).on('postgres_changes', {event:'*',schema:'public',table:'memories',filter:'pair_id=eq.' + pair.id}, () => loadMemories()).subscribe();
+    const onFocus = () => loadMemories();
+    window.addEventListener('focus', onFocus);
+    return () => {window.removeEventListener('focus', onFocus); supabase.removeChannel(ch);};
+  }, [pair?.id, loadMemories]);
+
+  const saveMemory = async (fields, existing) => {
+    if (!pair?.id || !uid) throw new Error('Login terlebih dahulu.');
+    const query = existing?.id
+      ? supabase.from('memories').update(fields).eq('id', existing.id).eq('pair_id', pair.id)
+      : supabase.from('memories').insert({...fields, pair_id:pair.id, created_by:uid});
+    const { error } = await query;
+    if (error) throw error;
+    await loadMemories();
+  };
+  const deleteMemory = async memory => {
+    const { error } = await supabase.from('memories').delete().eq('id', memory.id).eq('pair_id', pair.id);
+    if (error) throw error;
+    await loadMemories();
+  };
 
   const addPlace = useCallback(async fields => {
     if (!pair || !uid) throw new Error('Wishlist belum siap.');
@@ -374,5 +411,5 @@ export default function App() {
   if (error && !profile) return <div className="error-page"><Brand/><div className="alert alert--error">{error}</div><button className="btn btn-primary" onClick={refreshScope}>Try again</button><button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Sign out</button></div>;
   if (!profile) return <Loader label="Opening our little space..."/>;
   if (!pair) return <PairSetup onCreated={setupPair} busy={busy} error={error}/>;
-  return <><Dashboard user={session.user} profile={profile} pair={pair} members={members} places={places} onAdd={addPlace} onEdit={editPlace} onRemove={removePlace} onSignOut={() => supabase.auth.signOut()} onRefresh={loadPlaces} notice={notice}/><Toast message={notice} close={() => setNotice('')}/></>;
+  return <><Dashboard user={session.user} profile={profile} pair={pair} members={members} places={places} memories={memories} onSaveMemory={saveMemory} onDeleteMemory={deleteMemory} onAdd={addPlace} onEdit={editPlace} onRemove={removePlace} onSignOut={() => supabase.auth.signOut()} onRefresh={loadPlaces} notice={notice}/><Toast message={notice} close={() => setNotice('')}/></>;
 }
