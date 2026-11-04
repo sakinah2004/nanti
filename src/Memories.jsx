@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import './memories.css';
 import { ArrowLeft, CalendarDays, ExternalLink, Heart, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 export const MEMORY_MOODS = [
