@@ -32,11 +32,12 @@ export function useDriveConnection(onProfileChange){
 }
 
 export function DriveConnect({drive}) {
-  return <div className="drive-panel"><div><b>📷 Photos in Google Drive</b><p>Photos uploaded from NANTI are kept private in your own Google Drive, not in Supabase Storage.</p>
-    {drive.account&&<small>Connected as {drive.account}</small>}
-    {drive.error&&<p className="drive-error">{drive.error}</p>}
-    {!driveConfigured()&&<p className="drive-error">Upload foto belum aktif. Album dan kalender tetap bisa digunakan.</p>}
-  </div><button className="btn btn-ghost" disabled={!driveConfigured()} onClick={drive.connect}>{drive.connected?'Reconnect Drive':'Connect Google Drive'}</button></div>;
+  if(!driveConfigured())return <div className="drive-panel-minimal">📷 Foto akan tersedia setelah Google Drive diaktifkan. Gallery dan Calendar tetap bisa digunakan.</div>;
+  if(drive.connected)return <div className="drive-panel-minimal">♡ Google Drive terhubung. Foto siap disimpan.</div>;
+  return <div className="drive-panel-minimal"><span>📷 Hubungkan Google Drive untuk menyimpan foto.</span>
+    <button className="btn btn-ghost" onClick={drive.connect}>Connect Drive</button>
+    {drive.error&&<small className="drive-error">{drive.error}</small>}
+  </div>;
 }
 
 export async function savePhotosToMemory(memory,files,partnerEmail) {
