@@ -46,8 +46,8 @@ export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, o
     setError('');
     if(files.length + photos.filter(p=>p.memory_id===initial?.id).length>5) return setError('Maksimal lima foto untuk satu kenangan.');
     if(files.length && !driveConfigured() && !isDemo) return setError('Upload foto belum diaktifkan. Hapus pilihan foto untuk menyimpan kenangan tanpa foto.');
-    if(files.length && !isDemo && !drive.connected) return setError('Hubungkan Google Drive satu kali untuk menyimpan foto.');
-    if(files.length && !isDemo && !partner?.google_drive_email) return setError('Pasangan perlu menghubungkan akun Google Drive satu kali sebelum foto dapat dibagikan secara privat.');
+    if(files.length && !isDemo && !drive.connected) return setError('Hubungkan Google Drive untuk menyimpan foto.');
+    if(files.length && !isDemo && !partner?.google_drive_email) return setError('Pasangan perlu menghubungkan akun Google Drive sebelum foto dapat dibagikan secara privat.');
     try {
       if (!title.trim() || title.trim().length > 120) throw new Error('Judul harus 1–120 karakter.');
       if (story.length > 4000) throw new Error('Cerita maksimal 4.000 karakter.');
@@ -85,7 +85,7 @@ export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, o
             <span aria-hidden="true">{option.emoji}</span><small>{option.value}</small>
           </button>)}
         </div>
-        {!isDemo && driveConfigured() && !drive.connected && <div className="memory-drive-setup"><span>📷 Hubungkan Google Drive satu kali untuk menyimpan foto pribadi.</span><button type="button" className="btn btn-ghost" onClick={drive.connect}>Connect Drive</button>{drive.error&&<small className="drive-error">{drive.error}</small>}</div>}
+        {!isDemo && driveConfigured() && !drive.connected && <div className="memory-drive-setup"><span>📷 Hubungkan Google Drive untuk menyimpan foto pribadi.</span><button type="button" className="btn btn-ghost" onClick={drive.connect}>Connect Drive</button>{drive.error&&<small className="drive-error">{drive.error}</small>}</div>}
         {isDemo ? <p className="memory-photo-info">Mode demo: upload foto belum tersedia.</p>:
           driveConfigured() ? <label className="memory-file-picker">📸 Pilih foto dari galeri
             <input type="file" accept="image/*" multiple onChange={e=>setFiles(Array.from(e.target.files||[]).slice(0,5))}/>
