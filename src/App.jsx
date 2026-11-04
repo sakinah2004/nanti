@@ -6,6 +6,9 @@ import {
   ShieldCheck, Shuffle, Sparkles, Trash2, UsersRound, WandSparkles, X
 } from 'lucide-react';
 import { supabase, isConfigured, CATEGORIES, normalizeUrl, getSource, placeholderTitle, localDate } from './lib';
+import Memories from './Memories';
+import OurMap from './OurMap';
+import './extraFeatures.css';
 
 const defaultDemoPlaces = [
   { id: 'd1', title: 'Little coffee corner', category: 'Cafe', city: 'Jakarta Selatan', status: 'want', is_favorite: true, notes: 'Cozy banget, coba weekend!', saved_by: 'demo-you', source_url: 'https://www.instagram.com/', created_at: '2026-10-29T10:00:00Z' },
@@ -125,13 +128,30 @@ function FormModal({ initial, onClose, onSave, busy }) {
   const [city, setCity] = useState(initial?.city || '');
   const [notes, setNotes] = useState(initial?.notes || '');
   const [status, setStatus] = useState(initial?.status || 'want');
+  const [cover,setCover] = useState(initial?.cover_url || '');
+  const [latitude,setLatitude] = useState(initial?.latitude ?? '');
+  const [longitude,setLongitude] = useState(initial?.longitude ?? '');
+  const [previewStatus,setPreviewStatus] = useState('');
+  const tryCover = async () => {
+    if (cover || !url.startsWith('https://') || !supabase) return;
+    setPreviewStatus('Looking for a cover…');
+    try {
+      const {data,error} = await supabase.functions.invoke('place-preview',{body:{url}});
+      if(error) throw error;
+      if(data?.cover_url) {setCover(data.cover_url);setPreviewStatus('Video cover found ♡');}
+      else setPreviewStatus('No automatic cover available. You can paste a cover URL below.');
+    } catch{setPreviewStatus('Preview unavailable. You can paste a cover URL manually.');}
+  };
   const [error, setError] = useState('');
   useEffect(() => { const key = (e) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key); }, [onClose]);
   const submit = async e => {
     e.preventDefault(); setError('');
     try {
       if (!editing) normalizeUrl(url);
-      await onSave({ url, title: title.trim(), category, city: city.trim(), notes: notes.trim(), status }, initial);
+      if(cover && (!/^https:\/\//i.test(cover)||cover.length>1800))throw new Error('Cover image harus link HTTPS yang valid.');
+      const lat=latitude===''?null:Number(latitude),lon=longitude===''?null:Number(longitude);
+      if((lat===null)!==(lon===null) || (lat!==null&&(!Number.isFinite(lat)||Math.abs(lat)>90))||(lon!==null&&(!Number.isFinite(lon)||Math.abs(lon)>180)))throw new Error('Isi latitude dan longitude yang valid, atau kosongkan keduanya.');
+      await onSave({ url, title: title.trim(), category, city: city.trim(), notes: notes.trim(), status, cover_url:cover||null,latitude:lat,longitude:lon }, initial);
       onClose();
     } catch(err) { setError(err.message || 'Gagal menyimpan.'); }
   };
@@ -139,10 +159,12 @@ function FormModal({ initial, onClose, onSave, busy }) {
     <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div className="modal-top"><div><span className="eyebrow text-pink">LITTLE ADVENTURES</span><h2 id="modal-title">{editing ? 'Edit this place' : 'Save a new place'} <span>♡</span></h2></div><button aria-label="Close" className="icon-button" onClick={onClose}><X size={20}/></button></div>
       <form className="place-form" onSubmit={submit}>
-        <label>Social media / Google Maps link <span className="required">*</span><div className="input-icon"><LinkIcon size={17}/><input type="url" placeholder="https://www.instagram.com/reel/..." required disabled={editing} value={url} onChange={e => setUrl(e.target.value)} /></div></label>
+        <label>Social media / Google Maps link <span className="required">*</span><div className="input-icon"><LinkIcon size={17}/><input type="url" placeholder="https://www.instagram.com/reel/..." required disabled={editing} value={url} onChange={e => setUrl(e.target.value)} onBlur={tryCover} /></div></label>
         <label>Nama tempat <span className="sub-label">(kalau belum tahu, boleh kosong)</span><input maxLength={160} placeholder="Misalnya: Hidden café in Bandung" value={title} onChange={e => setTitle(e.target.value)} /></label>
+        <label>Cover image (auto-detect dari TikTok jika tersedia)<input type="url" maxLength={1800} placeholder="https://...image.jpg" value={cover} onChange={e=>setCover(e.target.value)}/>{previewStatus && <small className="muted">{previewStatus}</small>}{cover && <img className="form-cover-preview" src={cover} alt="Cover preview" referrerPolicy="no-referrer" onError={e=>e.currentTarget.style.display='none'}/>}</label>
         <label>Category<div className="category-choices">{CATEGORIES.map(c => <button className={category === c.value ? 'selected' : ''} type="button" key={c.value} onClick={() => setCategory(c.value)}><span>{c.emoji}</span>{c.label}</button>)}</div></label>
         <label>Area / kota<input maxLength={100} placeholder="Misalnya: Jakarta Selatan" value={city} onChange={e => setCity(e.target.value)} /></label>
+        <div className="place-coordinate-row"><label>Latitude (untuk Our Map)<input type="number" step="any" min="-90" max="90" placeholder="-6.2088" value={latitude} onChange={e=>setLatitude(e.target.value)}/></label><label>Longitude<input type="number" step="any" min="-180" max="180" placeholder="106.8456" value={longitude} onChange={e=>setLongitude(e.target.value)}/></label></div><small className="muted">Salin koordinat dari Google Maps. Kedua kolom opsional.</small>
         <label>Catatan pribadi<textarea rows={3} maxLength={2000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Kenapa pengen ke sini? Apa yang mau dicoba?" /></label>
         <label>Status<select value={status} onChange={e => setStatus(e.target.value)}><option value="want">♡ Want to go</option><option value="visited">✓ Visited</option></select></label>
         {error && <div className="alert alert--error">{error}</div>}
@@ -156,6 +178,7 @@ function PlaceCard({ place, memberName, onEdit, onToggleFavorite, onToggleVisite
   const meta = CATEGORIES.find(x => x.value === place.category) || CATEGORIES.at(-1);
   return <article className="place-card">
     <div className={`place-art place-art--${meta.gradient}`}>
+      {place.cover_url && <img className="place-cover" src={place.cover_url} alt={'Cover '+place.title} loading="lazy" referrerPolicy="no-referrer" onError={e=>{e.currentTarget.style.display='none'}}/>}
       <div className="place-art-pattern">✳</div><div className="place-emoji">{meta.emoji}</div>
       <button className={`heart-button ${place.is_favorite ? 'is-favorite' : ''}`} title={place.is_favorite ? 'Remove favorite' : 'Add favorite'} aria-label="Toggle favorite" disabled={busy} onClick={() => onToggleFavorite(place)}><Heart size={19} fill={place.is_favorite ? 'currentColor' : 'none'}/></button>
       <div className="place-category">{meta.label}</div>
@@ -171,8 +194,9 @@ function PlaceCard({ place, memberName, onEdit, onToggleFavorite, onToggleVisite
   </article>;
 }
 
-function Dashboard({ user, profile, pair, members, places, onAdd, onEdit, onRemove, onSignOut, onRefresh, isDemo = false, notice = '' }) {
+function Dashboard({ user, profile, pair, members, places, memories, photos = [], onPhotosChange, onDriveConnected, onAdd, onEdit, onRemove, onSaveMemory, onDeleteMemory, onSignOut, onRefresh, isDemo = false, notice = '' }) {
   const [view, setView] = useState('want');
+  const [section, setSection] = useState('places');
   const [cat, setCat] = useState('All');
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState(null);
@@ -205,13 +229,15 @@ function Dashboard({ user, profile, pair, members, places, onAdd, onEdit, onRemo
     setToast('Backup CSV downloaded ♡');
   };
   const copy = async value => { try { await navigator.clipboard.writeText(value); setToast('Copied to clipboard ♡'); } catch { setToast('Gagal menyalin. Salin teks secara manual.'); } };
+  if (section === 'map') return <div className="app-shell app-transition"><OurMap places={places} memories={memories} onBack={()=>setSection('places')} onEdit={place=>{setSection('places');setModal(place)}}/></div>;
+  if (section === 'memories') return <div className="app-shell app-transition"><header className="site-header"><div className="header-inner"><Brand/><nav className="desktop-nav"><button className="nav-link" onClick={() => setSection('places')}>Our places</button><button className="nav-link active">Our memories ♡</button></nav><button className="header-new-btn" onClick={() => setSection('places')}>Our places</button></div></header><Memories memories={memories} places={places} photos={photos} user={user} members={members} onPhotosChange={onPhotosChange} onDriveConnected={onDriveConnected} onSave={onSaveMemory} onDelete={onDeleteMemory} onBack={() => setSection('places')} isDemo={isDemo}/></div>;
   return <div className="app-shell">
     {isDemo && <div className="demo-banner">✦ MODE PREVIEW — Data ini contoh dan tidak tersimpan online. Hubungkan Supabase untuk versi sungguhan. <a href="#setup-notes">Cara setup</a></div>}
-    <header className="site-header"><div className="header-inner"><Brand/><nav className="desktop-nav"><button className="nav-link active">Our places <span>♡</span></button><button className="nav-link" onClick={() => setShowInvite(true)}>Our space</button></nav><div className="header-actions"><div className="members-avatars" title="Just the two of you">{members.map((m,i) => <div key={m.id} className={`avatar avatar--${i}`}>{(m.display_name || '♡').charAt(0).toUpperCase()}</div>)}{members.length === 1 && <div className="avatar avatar--empty">+</div>}</div><button className="header-new-btn" onClick={() => setModal({})}><Plus size={17}/>Add a place</button><button onClick={() => setMobileMenu(!mobileMenu)} className="icon-button menu-btn" aria-label="Menu"><Menu size={22}/></button></div></div></header>
-    {mobileMenu && <div className="mobile-popover"><button onClick={() => { setShowInvite(true); setMobileMenu(false); }}><UsersRound size={17}/> Our space</button><button onClick={onSignOut}><LogOut size={17}/> Sign out</button></div>}
+    <header className="site-header"><div className="header-inner"><Brand/><nav className="desktop-nav"><button className="nav-link active">Our places <span>♡</span></button><button className="nav-link" onClick={() => setSection('memories')}>Our memories</button><button className="nav-link" onClick={() => setSection('map')}>Our map</button><button className="nav-link" onClick={() => setShowInvite(true)}>Our space</button></nav><div className="header-actions"><div className="members-avatars" title="Just the two of you">{members.map((m,i) => <div key={m.id} className={`avatar avatar--${i}`}>{(m.display_name || '♡').charAt(0).toUpperCase()}</div>)}{members.length === 1 && <div className="avatar avatar--empty">+</div>}</div><button className="header-new-btn" onClick={() => setModal({})}><Plus size={17}/>Add a place</button><button onClick={() => setMobileMenu(!mobileMenu)} className="icon-button menu-btn" aria-label="Menu"><Menu size={22}/></button></div></div></header>
+    {mobileMenu && <div className="mobile-popover"><button onClick={() => { setShowInvite(true); setMobileMenu(false); }}><UsersRound size={17}/> Our space</button><button onClick={() => { setSection('memories'); setMobileMenu(false); }}><Heart size={17}/> Our memories</button><button onClick={() => { setSection('map'); setMobileMenu(false); }}><MapPin size={17}/> Our map</button><button onClick={onSignOut}><LogOut size={17}/> Sign out</button></div>}
     <main className="main-container">
       <section className="hero">
-        <div className="hero-copy"><div className="hero-kicker"><span className="kicker-line"></span> OUR LITTLE CORNER OF THE INTERNET <span>✳</span></div><h1>Places to go.<br/><em>Memories to make.</em></h1><p>Every cute café, hidden gem, and spontaneous adventure — all in one place, just for us.</p><div className="hero-buttons"><button className="btn btn-dark" onClick={() => setModal({})}><Plus size={18}/> Save a new place</button><button className="btn btn-hero-outline" onClick={pickRandom}><Shuffle size={17}/> Pick our next date</button></div></div>
+        <div className="hero-copy"><div className="hero-kicker"><span className="kicker-line"></span> OUR LITTLE CORNER OF THE INTERNET <span>✳</span></div><h1>Places to go.<br/><em>Memories to make.</em></h1><p>Every cute café, hidden gem, and spontaneous adventure — all in one place, just for us.</p><div className="hero-buttons"><button className="btn btn-dark" onClick={() => setModal({})}><Plus size={18}/> Save a new place</button><button className="btn btn-hero-outline" onClick={pickRandom}><Shuffle size={17}/> Pick our next date</button><button className="btn btn-hero-outline" onClick={() => setSection('memories')}><Heart size={17}/> Our Memories</button><button className="btn btn-hero-outline" onClick={() => setSection('map')}><MapPin size={17}/> Our Map</button></div></div>
         <div className="hero-graphic"><div className="hero-orbit hero-orbit--one"></div><div className="hero-orbit hero-orbit--two"></div><span className="graphic-sparkle gs-one">✦</span><span className="graphic-sparkle gs-two">✳</span><div className="hero-polaroid hero-polaroid--back"><span>🌿</span><small>an outdoor adventure</small></div><div className="hero-polaroid hero-polaroid--front"><span>☕</span><small>coffee with you ♡</small></div><div className="hero-ribbon">you + me + everywhere</div></div>
       </section>
       <section className="stats-grid" aria-label="Wishlist statistics"><button className={`stat ${view === 'want' ? 'stat--active' : ''}`} onClick={() => { setView('want'); setCat('All'); setQuery(''); }}><div className="stat-icon stat-icon--rose"><Bookmark size={20}/></div><div><div className="stat-number">{stats.want.toString().padStart(2,'0')}</div><div className="stat-label">Want to go</div></div><ArrowDownRight size={16} className="stat-arrow"/></button><button className={`stat ${view === 'visited' ? 'stat--active' : ''}`} onClick={() => { setView('visited'); setCat('All'); setQuery(''); }}><div className="stat-icon stat-icon--sage"><Check size={20}/></div><div><div className="stat-number">{stats.visited.toString().padStart(2,'0')}</div><div className="stat-label">We've been</div></div><ArrowDownRight size={16} className="stat-arrow"/></button><button className={`stat ${view === 'favorite' ? 'stat--active' : ''}`} onClick={() => { setView('favorite'); setCat('All'); setQuery(''); }}><div className="stat-icon stat-icon--peach"><Heart size={20}/></div><div><div className="stat-number">{stats.favorite.toString().padStart(2,'0')}</div><div className="stat-label">Our favorites</div></div><ArrowDownRight size={16} className="stat-arrow"/></button></section>
@@ -231,6 +257,7 @@ function Dashboard({ user, profile, pair, members, places, onAdd, onEdit, onRemo
 
 function DemoApp() {
   const [places, setPlaces] = useState(defaultDemoPlaces);
+  const [memories, setMemories] = useState([]);
   const [toast, setToast] = useState('');
   const add = async fields => {
     const canonical_url = normalizeUrl(fields.url);
@@ -239,7 +266,9 @@ function DemoApp() {
   };
   const edit = async (place, patch) => setPlaces(s => s.map(p => p.id === place.id ? { ...p, ...patch, title: patch.title || p.title } : p));
   const remove = async place => setPlaces(s => s.filter(p => p.id !== place.id));
-  return <><Dashboard user={{ id: 'demo-you' }} profile={{ display_name:'You' }} pair={{ invite_code: 'DEMO-CODE' }} members={[{ id:'demo-you', display_name:'You' },{ id:'demo-him', display_name:'Him' }]} places={places} onAdd={add} onEdit={edit} onRemove={remove} onSignOut={() => setToast('Mode preview: tidak ada akun untuk logout.')} isDemo/><div className="demo-instructions" id="setup-notes"><b>Mode preview</b> — Untuk menyimpan data online bersama pasangan, ikuti langkah di README.md dan isi variabel Supabase.</div><Toast message={toast} close={() => setToast('')}/></>;
+  const saveMemory = async (fields, existing) => setMemories(current => existing?.id ? current.map(m => m.id === existing.id ? { ...m, ...fields } : m) : [{ ...fields, id: crypto.randomUUID(), created_by: 'demo-you' }, ...current]);
+  const deleteMemory = async memory => setMemories(current => current.filter(m => m.id !== memory.id));
+  return <><Dashboard user={{ id: 'demo-you' }} profile={{ display_name:'You' }} pair={{ invite_code: 'DEMO-CODE' }} members={[{ id:'demo-you', display_name:'You' },{ id:'demo-him', display_name:'Him' }]} places={places} memories={memories} onSaveMemory={saveMemory} onDeleteMemory={deleteMemory} onAdd={add} onEdit={edit} onRemove={remove} onSignOut={() => setToast('Mode preview: tidak ada akun untuk logout.')} isDemo/><div className="demo-instructions" id="setup-notes"><b>Mode preview</b> — Untuk menyimpan data online bersama pasangan, ikuti langkah di README.md dan isi variabel Supabase.</div><Toast message={toast} close={() => setToast('')}/></>;
 }
 
 export default function App() {
@@ -249,6 +278,8 @@ export default function App() {
   const [pair, setPair] = useState(null);
   const [members, setMembers] = useState([]);
   const [places, setPlaces] = useState([]);
+  const [memories, setMemories] = useState([]);
+  const [photos,setPhotos]=useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -263,7 +294,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => { if (live) { setSession(data.session); setAuthReady(true); } }).catch(() => { if(live) setAuthReady(true); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, next) => {
       if(!live) return;
-      if(event === 'SIGNED_OUT') { setProfile(null); setPair(null); setMembers([]); setPlaces([]); }
+      if(event === 'SIGNED_OUT') { setProfile(null); setPair(null); setMembers([]); setPlaces([]); setMemories([]); setPhotos([]); }
       setSession(next); setAuthReady(true);
     });
     return () => { live = false; subscription.unsubscribe(); };
@@ -273,17 +304,17 @@ export default function App() {
     if (!supabase || !uid) return;
     setScopeLoading(true);
     try {
-      const { data: p, error: profileErr } = await supabase.from('profiles').select('id, display_name, pair_id').eq('id', uid).single();
+      const { data: p, error: profileErr } = await supabase.from('profiles').select('id, display_name, pair_id, google_drive_email').eq('id', uid).single();
       if (profileErr) throw profileErr;
       setProfile(p);
       if (p.pair_id) {
         const [{ data: pa, error: pairErr }, { data: mem, error: memErr }] = await Promise.all([
           supabase.from('pairs').select('id, invite_code, created_at').eq('id', p.pair_id).single(),
-          supabase.from('profiles').select('id, display_name').eq('pair_id', p.pair_id)
+          supabase.from('profiles').select('id, display_name, google_drive_email').eq('pair_id', p.pair_id)
         ]);
         if (pairErr) throw pairErr; if (memErr) throw memErr;
         setPair(pa); setMembers(mem || []);
-      } else { setPair(null); setMembers([]); setPlaces([]); }
+      } else { setPair(null); setMembers([]); setPlaces([]); setMemories([]); setPhotos([]); }
       setError('');
     } catch (e) { setError(e.message || 'Gagal memuat profil.'); }
     finally { setScopeLoading(false); }
@@ -308,6 +339,43 @@ export default function App() {
     return () => { clearInterval(t); window.removeEventListener('focus', onFocus); supabase.removeChannel(channel); };
   }, [pair?.id, loadPlaces, refreshScope]);
 
+  const loadMemories = useCallback(async () => {
+    if (!pair?.id) return;
+    const { data, error } = await supabase.from('memories').select('*').eq('pair_id', pair.id).order('memory_date', {ascending:false});
+    if (error) setNotice('Gagal memuat memories. Jalankan migration SQL Date Memories terlebih dahulu: ' + error.message);
+    else setMemories(data || []);
+  }, [pair?.id]);
+  useEffect(() => {
+    if (!pair?.id) return;
+    loadMemories();
+    const ch = supabase.channel('memories-' + pair.id).on('postgres_changes', {event:'*',schema:'public',table:'memories',filter:'pair_id=eq.' + pair.id}, () => loadMemories()).subscribe();
+    const onFocus = () => loadMemories();
+    window.addEventListener('focus', onFocus);
+    return () => {window.removeEventListener('focus', onFocus); supabase.removeChannel(ch);};
+  }, [pair?.id, loadMemories]);
+
+  const saveMemory = async (fields, existing) => {
+    if (!pair?.id || !uid) throw new Error('Login terlebih dahulu.');
+    const query = existing?.id
+      ? supabase.from('memories').update(fields).eq('id', existing.id).eq('pair_id', pair.id)
+      : supabase.from('memories').insert({...fields, pair_id:pair.id, created_by:uid});
+    const { error } = await query;
+    if (error) throw error;
+    await loadMemories();
+  };
+  const deleteMemory = async memory => {
+    const { error } = await supabase.from('memories').delete().eq('id', memory.id).eq('pair_id', pair.id);
+    if (error) throw error;
+    await loadMemories();
+  };
+
+  const loadPhotos = useCallback(async () => {
+    if(!pair?.id)return;
+    const {data,error}=await supabase.from('memory_photos').select('*').eq('pair_id',pair.id);
+    if(!error)setPhotos(data||[]);else setNotice('Photo sync: '+error.message);
+  },[pair?.id]);
+  useEffect(()=>{if(pair?.id)loadPhotos();},[pair?.id,loadPhotos]);
+
   const addPlace = useCallback(async fields => {
     if (!pair || !uid) throw new Error('Wishlist belum siap.');
     const canonical_url = normalizeUrl(fields.url);
@@ -318,14 +386,26 @@ export default function App() {
       pair_id: pair.id, saved_by:uid, source_url:fields.url.trim(), canonical_url,
       title:(fields.title || placeholderTitle(fields.url)).slice(0,160), category:fields.category || 'Other',
       city:fields.city || '', notes:fields.notes || '', status:fields.status || 'want',
+      cover_url:fields.cover_url||null,latitude:fields.latitude,longitude:fields.longitude,
       visited_at: fields.status === 'visited' ? new Date().toISOString() : null
     });
     if (addErr) { if (addErr.code === '23505') throw new Error('Link ini sudah ada di wishlist kalian ♡'); throw addErr; }
     await loadPlaces();
+    // TikTok thumbnails are best-effort; save the place immediately even if preview fails.
+    if (!fields.cover_url && /(?:tiktok\.com)/i.test(fields.url)) {
+      supabase.functions.invoke('place-preview',{body:{url:fields.url}})
+        .then(async ({data,error})=>{
+          if(!error && data?.cover_url){
+            const {error:coverErr}=await supabase.from('places').update({cover_url:data.cover_url})
+              .eq('pair_id',pair.id).eq('canonical_url',canonical_url).is('cover_url',null);
+            if(!coverErr) await loadPlaces();
+          }
+        }).catch(()=>{});
+    }
   }, [pair,uid,loadPlaces]);
   const editPlace = async (place, fields) => {
     // Kolom identitas (pair_id, saved_by, URL) tidak dapat diubah melalui frontend.
-    const allowed = ['title','category','city','notes','status','is_favorite','visited_at'];
+    const allowed = ['title','category','city','notes','status','is_favorite','visited_at','cover_url','latitude','longitude'];
     const patch = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.includes(k)));
     if (patch.title !== undefined) patch.title = patch.title || place.title;
     if (fields.status === 'visited' && place.status !== 'visited' && !('visited_at' in patch)) patch.visited_at = new Date().toISOString();
@@ -374,5 +454,5 @@ export default function App() {
   if (error && !profile) return <div className="error-page"><Brand/><div className="alert alert--error">{error}</div><button className="btn btn-primary" onClick={refreshScope}>Try again</button><button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Sign out</button></div>;
   if (!profile) return <Loader label="Opening our little space..."/>;
   if (!pair) return <PairSetup onCreated={setupPair} busy={busy} error={error}/>;
-  return <><Dashboard user={session.user} profile={profile} pair={pair} members={members} places={places} onAdd={addPlace} onEdit={editPlace} onRemove={removePlace} onSignOut={() => supabase.auth.signOut()} onRefresh={loadPlaces} notice={notice}/><Toast message={notice} close={() => setNotice('')}/></>;
+  return <><Dashboard user={session.user} profile={profile} pair={pair} members={members} places={places} memories={memories} photos={photos} onPhotosChange={loadPhotos} onDriveConnected={refreshScope} onSaveMemory={saveMemory} onDeleteMemory={deleteMemory} onAdd={addPlace} onEdit={editPlace} onRemove={removePlace} onSignOut={() => supabase.auth.signOut()} onRefresh={loadPlaces} notice={notice}/><Toast message={notice} close={() => setNotice('')}/></>;
 }

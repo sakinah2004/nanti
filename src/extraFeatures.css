@@ -1,0 +1,49 @@
+/* NANTI 2.0 — gentle, reduced-motion-aware UI transitions */
+.app-transition,.app-shell{animation:nanti-page-enter .38s cubic-bezier(.2,.8,.2,1) both}
+@keyframes nanti-page-enter{from{opacity:.4;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.place-card,.memory-card{transition:transform .27s cubic-bezier(.2,.8,.2,1),box-shadow .27s}
+.place-card:hover,.memory-card:hover{transform:translateY(-4px);box-shadow:0 14px 35px #ba879822}
+.btn:active,.mood-choice:active,.nav-link:active{transform:scale(.96)}
+.place-cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.place-cover~.place-art-pattern,.place-cover~.place-emoji{display:none}
+.place-cover~.place-category{z-index:2}
+.form-cover-preview{display:block;width:100%;max-height:140px;object-fit:cover;border-radius:10px;margin-top:8px}
+.place-coordinate-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.memories-tabs{display:flex;gap:8px;margin:18px 0}
+.memories-tabs button,.map-switches button{border:1px solid #ecdce1;border-radius:99px;background:#fff;color:#9b6d7d;font-weight:700;padding:11px 21px;font-size:12px}
+.memories-tabs button.selected,.map-switches button.selected{background:#bd7089;color:#fff;border-color:#bd7089}
+.calendar-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(220px,1fr);gap:22px}
+.memory-calendar,.calendar-details{border:1px solid #f0e3e7;background:#fff;border-radius:18px;padding:23px}
+.calendar-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:19px}
+.calendar-top h2{font-family:var(--serif);font-weight:500;font-size:25px;margin:5px 0 0}
+.calendar-top>button{border:0;background:#fcf1f3;border-radius:50%;display:grid;place-items:center;color:#a36479;width:36px;height:36px}
+.calendar-cells{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}
+.calendar-week{text-align:center;color:#ad949e;font-size:11px;font-weight:700;padding:7px 0}
+.calendar-day{min-height:80px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:6px;border:1px solid #f3e7e8;border-radius:10px;background:#fffaf9;padding:9px;color:#715561;text-align:left}
+.calendar-day:hover{background:#fff0f4}.calendar-day.today{border-color:#d1a4b1}.calendar-day.chosen{background:#fce3eb;border-color:#c26f89}
+.calendar-day>span:first-child{font-weight:700;font-size:12px}.calendar-dots{display:flex;flex-wrap:wrap;gap:1px;font-size:16px}.calendar-day small{font-size:9px}
+.calendar-details h3{font-family:var(--serif);font-size:24px;font-weight:500;margin:9px 0 16px}.calendar-details>p{font-size:12px;color:#a68c98;line-height:1.8}
+.calendar-memory-link{display:flex;align-items:center;gap:9px;background:#fff6f7;border:1px solid #f6e8eb;padding:12px;border-radius:12px;width:100%;margin:8px 0;text-align:left}
+.calendar-memory-link>span{font-size:27px}.calendar-memory-link b{font-size:12px;display:block;color:#754e62}.calendar-memory-link small{font-size:10px;color:#aa8592}
+.calendar-note{display:flex;gap:8px;align-items:center;color:#a77d8b;font-size:11px;margin-top:25px;font-style:italic}
+.drive-panel{display:flex;justify-content:space-between;align-items:center;gap:18px;background:#fff3f6;border:1px solid #f3dfe5;border-radius:14px;padding:16px;margin:20px 0}
+.drive-panel b{font-size:12px}.drive-panel p{margin:7px 0;color:#8f7682;font-size:11px;line-height:1.6}.drive-panel small{display:block;color:#7e6770;font-size:10px}
+.drive-error{color:#b14761!important;font-size:11px!important;margin:8px 0}
+.memory-photo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:12px 0}
+.memory-photo-tile{background:#f7ebee;border-radius:9px;overflow:hidden;min-height:80px}
+.memory-photo-tile img{width:100%;height:94px;object-fit:cover;display:block}
+.memory-photo-placeholder{min-height:94px;display:grid;place-items:center;text-align:center;color:#a58994;font-size:10px;padding:6px}
+.memory-photo-tile a{display:block;padding:5px;font-size:9px;color:#9e5b75}
+.memory-upload{display:inline-flex;align-items:center;gap:8px;cursor:pointer;background:#fcf1f4;border:1px dashed #d5a3b5;color:#ae6282;border-radius:10px;padding:10px;font-size:11px;font-weight:700}
+.memory-upload input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.memory-upload.disabled{opacity:.55;cursor:wait}
+.map-page{padding-bottom:48px}.map-intro{margin:20px 0}.map-intro h1{font-family:var(--serif);font-size:clamp(32px,5vw,48px);font-weight:500;margin:10px 0}.map-intro p{font-size:12px;color:#947883}
+.map-switches{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.map-body{display:grid;grid-template-columns:minmax(0,2fr) minmax(210px,1fr);border:1px solid #f2e5e7;border-radius:18px;overflow:hidden;min-height:460px}
+.nanti-map{height:460px;width:100%;background:#e9f0e3;z-index:0}.map-side{padding:22px;background:#fffaf9}
+.map-side h3{font-size:20px;font-family:var(--serif);font-weight:500;margin:0 0 14px}.map-side p{color:#907f85;font-size:12px;line-height:1.7}.map-side>a{display:flex;gap:7px;align-items:center;color:#ad6c82;font-size:11px;font-weight:700;margin-top:15px}
+.map-text-button{border:0;background:#fff0f4;border-radius:8px;padding:9px;color:#9e6680;margin:10px 0}
+.map-location-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto}.map-location-list button{text-align:left;display:flex;align-items:center;gap:8px;border:0;border-radius:8px;padding:11px;background:#fff0f2;color:#885666}
+.map-empty{padding:30px 5px;text-align:center;color:#b78e9c}.map-memory{font-size:11px;padding:10px 4px;border-bottom:1px solid #eee0e4}.map-memory small{color:#b19fa5;display:block}
+.map-attribution{display:block;margin-top:25px;font-size:10px;color:#ab9499}
+@media(max-width:700px){.calendar-layout,.map-body{grid-template-columns:1fr}.nanti-map{height:340px}.calendar-day{min-height:62px;padding:6px}.calendar-cells{gap:3px}.calendar-dots{font-size:12px}.memory-calendar,.calendar-details{padding:15px}.drive-panel{flex-direction:column;align-items:flex-start}.place-coordinate-row{grid-template-columns:1fr 1fr}}
+@media(prefers-reduced-motion:reduce){.app-transition,.app-shell{animation:none!important}.place-card,.memory-card,.btn,.mood-choice,.nav-link{transition:none!important;animation:none!important;transform:none!important}}
