@@ -207,7 +207,8 @@ function PlaceCard({ place, memberName, onEdit, onToggleFavorite, onToggleVisite
       <div className="place-area"><MapPin size={14}/>{place.city || 'Location not added yet'}</div>
       {place.notes && <p className="place-note">{place.notes}</p>}
       <div className="place-bottom"><span className={`status-pill ${place.status === 'visited' ? 'status-pill--visited' : ''}`}>{place.status === 'visited' ? '✓ Visited' : '♡ Want to go'}</span><span className="place-date">{localDate(place.created_at)}</span></div>
-      <div className="place-actions"><a href={place.source_url} target="_blank" rel="noopener noreferrer" className="source-link">View post <ExternalLink size={14}/></a><div className="card-icon-actions"><button title={place.status === 'want' ? 'Mark visited' : 'Back to wishlist'} aria-label="Change visited status" disabled={busy} onClick={() => onToggleVisited(place)}><CheckCheck size={17}/></button><button title="Edit" aria-label="Edit place" disabled={busy} onClick={() => onEdit(place)}><Pencil size={16}/></button><button title="Delete" aria-label="Delete place" disabled={busy} onClick={() => onDelete(place)}><Trash2 size={16}/></button></div></div>
+      <button className="place-visit-cta" disabled={busy} onClick={()=>onToggleVisited(place)}>{place.status==='want'?'♡ We’ve Been Here':'📸 Add a Memory ♡'}</button>
+      <div className="place-actions"><a href={place.source_url} target="_blank" rel="noopener noreferrer" className="source-link">View post <ExternalLink size={14}/></a><div className="card-icon-actions"><button title="Edit" aria-label="Edit place" disabled={busy} onClick={() => onEdit(place)}><Pencil size={16}/></button><button title="Delete" aria-label="Delete place" disabled={busy} onClick={() => onDelete(place)}><Trash2 size={16}/></button></div></div>
     </div>
   </article>;
 }
@@ -218,6 +219,7 @@ function Dashboard({ user, profile, pair, members, places, memories, photos = []
   const [cat, setCat] = useState('All');
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState(null);
+  const [quickMemory,setQuickMemory]=useState(null);
   const [showInvite, setShowInvite] = useState(false);
   const [toast, setToast] = useState(notice);
   const [busy, setBusy] = useState(false);
@@ -231,7 +233,15 @@ function Dashboard({ user, profile, pair, members, places, memories, photos = []
   const memberName = id => members.find(m => m.id === id)?.display_name || (id === user.id ? 'you' : 'partner');
   const doSave = async (fields, existing) => { setBusy(true); try { await (existing?.id ? onEdit(existing, fields) : onAdd(fields)); setToast(existing?.id ? 'Place updated ♡' : 'Added to our places ♡'); } finally { setBusy(false); } };
   const doFavorite = async (place) => { setBusy(true); try { await onEdit(place, { is_favorite: !place.is_favorite }); } catch(e) { setToast(e.message); } finally { setBusy(false); } };
-  const doVisited = async place => { setBusy(true); try { const visited = place.status !== 'visited'; await onEdit(place, { status: visited ? 'visited' : 'want', visited_at: visited ? new Date().toISOString() : null }); setToast(visited ? 'Another little memory made ♡' : 'Back on the wishlist ♡'); } catch(e) { setToast(e.message); } finally { setBusy(false); } };
+  const doVisited = async place => {
+    setBusy(true);
+    try {
+      if(place.status !== 'visited') await onEdit(place,{status:'visited',visited_at:new Date().toISOString()});
+      setView('visited');setCat('All');setQuery('');
+      setQuickMemory({place_id:place.id,title:('Our date at '+place.title).slice(0,120),memory_date:todayLocalISO(),mood:'Happy',story:''});
+      setToast('Date added ♡ Choose a mood to keep this memory.');
+    } catch(e) {setToast(e.message);} finally {setBusy(false);}
+  };
   const doRemove = async place => { if (!window.confirm(`Hapus "${place.title}" dari wishlist kalian?`)) return; setBusy(true); try { await onRemove(place); setToast('Place removed'); } catch(e) { setToast(e.message); } finally { setBusy(false); } };
   const pickRandom = () => { const options = places.filter(p => p.status === 'want'); if (!options.length) return setToast('Tambahkan tempat dulu, ya!'); const random = options[Math.floor(Math.random() * options.length)]; setView('want'); setCat('All'); setQuery(random.title); setToast(`Your next date: ${random.title} ♡`); };
   const inviteUrl = pair?.invite_code ? `${window.location.origin}/?join=${encodeURIComponent(pair.invite_code)}` : '';
@@ -267,7 +277,8 @@ function Dashboard({ user, profile, pair, members, places, memories, photos = []
       <section className="footer-note"><div><span>✳</span> Every little date counts.</div><p>Made with ♡ for the places we'll go together.</p></section>
     </main>
     <footer className="site-footer"><Brand/><span>our next adventure is just around the corner ♡</span><button onClick={onSignOut}><LogOut size={15}/> Sign out</button></footer>
-    {modal && <FormModal initial={modal} onClose={() => setModal(null)} onSave={doSave} busy={busy}/>}
+    {modal && <FormModal initial={modal} onClose={() => setModal(null)} onSave={doSave} busy={busy}/>} 
+    {quickMemory && <MemoryForm initial={quickMemory} places={places} user={user} members={members} isDemo={isDemo} onDriveConnected={onDriveConnected} onPhotosChange={onPhotosChange} onSave={async(fields,existing)=>{const result=await onSaveMemory(fields,existing);setToast('Our memory saved ♡');return result;}} onPartialError={setToast} onClose={()=>setQuickMemory(null)}/>} 
     {showInvite && <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && setShowInvite(false)}><div className="modal invite-modal" role="dialog" aria-modal="true"><div className="modal-top"><div><span className="eyebrow text-pink">JUST US TWO</span><h2>Our little space ♡</h2></div><button className="icon-button" onClick={() => setShowInvite(false)} aria-label="Close"><X size={20}/></button></div><div className="invite-heart">💕</div><p className="muted">Kalian punya satu wishlist bersama. Undang pasangan menggunakan link ini, dan minta dia mendaftar dengan akunnya sendiri.</p><div className="invite-members">{members.map(m => <div key={m.id}><div className="avatar">{m.display_name.charAt(0).toUpperCase()}</div><span>{m.display_name}</span><Check size={14}/></div>)}</div><button className="btn btn-ghost btn-wide" onClick={exportCsv} style={{marginBottom: 16}}><Bookmark size={16}/> Download wishlist backup (CSV)</button>{members.length < 2 ? <><label className="invite-code-label">Invite code</label><div className="copy-field"><code>{pair?.invite_code || 'DEMO-CODE'}</code><button onClick={() => copy(pair?.invite_code || 'DEMO-CODE')}><Copy size={18}/></button></div><button className="btn btn-primary btn-wide" onClick={() => copy(inviteUrl || 'Demo: hubungkan Supabase dahulu')}><Copy size={17}/> Copy invitation link</button><small className="muted">Jaga kerahasiaan kode ini. Undangan berlaku untuk 1 pasangan tambahan.</small></> : <div className="alert alert--success">Wishlist sudah lengkap! Just the two of you ♡</div>}</div></div>}
     <Toast message={toast} close={() => setToast('')}/>
   </div>;
