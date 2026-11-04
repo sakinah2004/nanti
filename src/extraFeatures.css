@@ -69,3 +69,11 @@
 .memory-drive-setup{background:#fdf0f4;border:1px solid #efd5df;padding:11px;border-radius:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px;font-size:11px;color:#85576a}
 .memory-photo-info{font-size:11px;color:#957381;margin:0;line-height:1.6;background:#fcf4f6;padding:12px;border-radius:9px}
 @media(prefers-reduced-motion:reduce){.quick-place-extras,.memory-extra-fields{animation:none!important}.place-visit-cta{transition:none!important}}
+
+.memory-location-cta{display:flex;flex-direction:column;gap:6px;align-items:flex-start;background:#f5f7f0;border:1px solid #e3e7d9;padding:11px;border-radius:12px}
+.memory-location-cta button{border:0;background:#e4ecd9;color:#547355;border-radius:10px;padding:9px 11px;font-size:11px;font-weight:700;cursor:pointer}
+.memory-location-cta button:disabled{opacity:.6}
+.memory-location-cta small{font-size:10px;color:#788772}
+.drive-panel-minimal{display:flex;gap:12px;justify-content:space-between;align-items:center;background:#fdf5f7;border:1px solid #f2e3e8;border-radius:12px;padding:12px 15px;color:#8d6a7a;font-size:12px;line-height:1.6;margin:12px 0}
+.drive-panel-minimal button{flex-shrink:0}
+@media(max-width:500px){.drive-panel-minimal{align-items:flex-start;flex-direction:column}}
