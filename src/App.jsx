@@ -291,11 +291,16 @@ function DemoApp() {
   const add = async fields => {
     const canonical_url = normalizeUrl(fields.url);
     if (places.some(p => normalizeUrl(p.source_url) === canonical_url)) throw new Error('Link ini sudah ada di wishlist.');
-    setPlaces(s => [{ id: crypto.randomUUID(), source_url: fields.url, saved_by: 'demo-you', title: fields.title || placeholderTitle(fields.url), category: fields.category, city: fields.city, notes: fields.notes, status: fields.status, is_favorite: false, created_at: new Date().toISOString(), visited_at: fields.status === 'visited' ? new Date().toISOString() : null }, ...s]);
+    const coords=coordinatesFromLink(fields.url);
+    setPlaces(s => [{ id: crypto.randomUUID(), source_url: fields.url, saved_by: 'demo-you', title: fields.title || guessMapTitle(fields.url) || placeholderTitle(fields.url), category: fields.category, city: fields.city, notes: fields.notes, status: fields.status, cover_url:fields.cover_url||null, latitude:fields.latitude??coords?.latitude??null,longitude:fields.longitude??coords?.longitude??null, is_favorite: false, created_at: new Date().toISOString(), visited_at: fields.status === 'visited' ? new Date().toISOString() : null }, ...s]);
   };
   const edit = async (place, patch) => setPlaces(s => s.map(p => p.id === place.id ? { ...p, ...patch, title: patch.title || p.title } : p));
   const remove = async place => setPlaces(s => s.filter(p => p.id !== place.id));
-  const saveMemory = async (fields, existing) => setMemories(current => existing?.id ? current.map(m => m.id === existing.id ? { ...m, ...fields } : m) : [{ ...fields, id: crypto.randomUUID(), created_by: 'demo-you' }, ...current]);
+  const saveMemory = async(fields,existing) => {
+    const saved=existing?.id?{...existing,...fields}:{...fields,id:crypto.randomUUID(),created_by:'demo-you',pair_id:'demo-pair'};
+    setMemories(current=>existing?.id?current.map(m=>m.id===saved.id?saved:m):[saved,...current]);
+    return saved;
+  };
   const deleteMemory = async memory => setMemories(current => current.filter(m => m.id !== memory.id));
   return <><Dashboard user={{ id: 'demo-you' }} profile={{ display_name:'You' }} pair={{ invite_code: 'DEMO-CODE' }} members={[{ id:'demo-you', display_name:'You' },{ id:'demo-him', display_name:'Him' }]} places={places} memories={memories} onSaveMemory={saveMemory} onDeleteMemory={deleteMemory} onAdd={add} onEdit={edit} onRemove={remove} onSignOut={() => setToast('Mode preview: tidak ada akun untuk logout.')} isDemo/><div className="demo-instructions" id="setup-notes"><b>Mode preview</b> — Untuk menyimpan data online bersama pasangan, ikuti langkah di README.md dan isi variabel Supabase.</div><Toast message={toast} close={() => setToast('')}/></>;
 }
@@ -388,9 +393,10 @@ export default function App() {
     const query = existing?.id
       ? supabase.from('memories').update(fields).eq('id', existing.id).eq('pair_id', pair.id)
       : supabase.from('memories').insert({...fields, pair_id:pair.id, created_by:uid});
-    const { error } = await query;
+    const { data: saved, error } = await query.select('*').single();
     if (error) throw error;
     await loadMemories();
+    return saved;
   };
   const deleteMemory = async memory => {
     const { error } = await supabase.from('memories').delete().eq('id', memory.id).eq('pair_id', pair.id);
@@ -411,11 +417,12 @@ export default function App() {
     const { data: duplicate, error: checkErr } = await supabase.from('places').select('id').eq('pair_id',pair.id).eq('canonical_url',canonical_url).maybeSingle();
     if (checkErr) throw checkErr;
     if (duplicate) throw new Error('Link ini sudah ada di wishlist kalian ♡');
+    const coords=coordinatesFromLink(fields.url);
     const { error: addErr } = await supabase.from('places').insert({
       pair_id: pair.id, saved_by:uid, source_url:fields.url.trim(), canonical_url,
-      title:(fields.title || placeholderTitle(fields.url)).slice(0,160), category:fields.category || 'Other',
+      title:(fields.title || guessMapTitle(fields.url) || placeholderTitle(fields.url)).slice(0,160), category:fields.category || 'Other',
       city:fields.city || '', notes:fields.notes || '', status:fields.status || 'want',
-      cover_url:fields.cover_url||null,latitude:fields.latitude,longitude:fields.longitude,
+      cover_url:fields.cover_url||null,latitude:fields.latitude??coords?.latitude??null,longitude:fields.longitude??coords?.longitude??null,
       visited_at: fields.status === 'visited' ? new Date().toISOString() : null
     });
     if (addErr) { if (addErr.code === '23505') throw new Error('Link ini sudah ada di wishlist kalian ♡'); throw addErr; }
@@ -425,7 +432,9 @@ export default function App() {
       supabase.functions.invoke('place-preview',{body:{url:fields.url}})
         .then(async ({data,error})=>{
           if(!error && data?.cover_url){
-            const {error:coverErr}=await supabase.from('places').update({cover_url:data.cover_url})
+            const title=data.title && !(fields.title||guessMapTitle(fields.url))?data.title.slice(0,160):null;
+            const patch={cover_url:data.cover_url};if(title)patch.title=title;
+            const {error:coverErr}=await supabase.from('places').update(patch)
               .eq('pair_id',pair.id).eq('canonical_url',canonical_url).is('cover_url',null);
             if(!coverErr) await loadPlaces();
           }
