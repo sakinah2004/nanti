@@ -99,6 +99,8 @@ export default function Memories({ memories, places, photos = [], onPhotosChange
   const [error, setError] = useState('');
   const [moodFilter, setMoodFilter] = useState('All');
   const [tab, setTab] = useState('gallery');
+  const [focusMemory,setFocusMemory]=useState(null);
+  useEffect(()=>{if(tab==='gallery'&&focusMemory){document.getElementById('memory-'+focusMemory)?.scrollIntoView({behavior:'smooth',block:'start'});setFocusMemory(null);}},[tab,focusMemory]);
   const drive = useDriveConnection(onDriveConnected);
   const partner = members.find(m=>m.id!==user?.id);
   const sorted = useMemo(() => memories.filter(m => moodFilter === 'All' || m.mood === moodFilter)
@@ -124,7 +126,7 @@ export default function Memories({ memories, places, photos = [], onPhotosChange
     {error && <div className="alert alert--error">{error}</div>}
     {!isDemo && <DriveConnect drive={drive}/>}
     <div className="memories-tabs"><button className={tab==='gallery'?'selected':''} onClick={()=>setTab('gallery')}>♡ Gallery</button><button className={tab==='calendar'?'selected':''} onClick={()=>setTab('calendar')}>▦ Calendar</button></div>
-    {tab==='calendar' && <MemoryCalendar memories={memories} places={places} onSelect={mem=>{setTab('gallery');setMoodFilter('All');document.getElementById('memory-'+mem.id)?.scrollIntoView({behavior:'smooth'});}}/>}
+    {tab==='calendar' && <MemoryCalendar memories={memories} places={places} onSelect={mem=>{setMoodFilter('All');setFocusMemory(mem.id);setTab('gallery');}}/>}
     {tab==='gallery' && <><div className="memory-filters">
       <button className={moodFilter === 'All' ? 'selected' : ''} onClick={() => setMoodFilter('All')}>All moods</button>
       {MEMORY_MOODS.map(m => <button key={m.value} className={moodFilter === m.value ? 'selected' : ''} onClick={() => setMoodFilter(m.value)}>{m.emoji} {m.value}</button>)}
