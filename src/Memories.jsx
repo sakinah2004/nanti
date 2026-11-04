@@ -12,7 +12,7 @@ export const MEMORY_MOODS = [
   { value: 'Peaceful', emoji: '🌿' }, { value: 'Unexpected', emoji: '😅' }
 ];
 
-export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, onDriveConnected, members = [], user, isDemo = false, onPartialError }) {
+export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, onDriveConnected, members = [], user, photos = [], isDemo = false, onPartialError }) {
   const [title, setTitle] = useState(initial?.title || 'Our little day ♡');
   const [memoryDate, setMemoryDate] = useState(initial?.memory_date || todayLocalISO());
   const [mood, setMood] = useState(initial?.mood || 'Happy');
@@ -34,6 +34,7 @@ export function MemoryForm({ initial, places, onSave, onClose, onPhotosChange, o
   async function submit(event) {
     event.preventDefault();
     setError('');
+    if(files.length + photos.filter(p=>p.memory_id===initial?.id).length>5) return setError('Maksimal lima foto untuk satu kenangan.');
     if(files.length && !driveConfigured() && !isDemo) return setError('Upload foto belum diaktifkan. Hapus pilihan foto untuk menyimpan kenangan tanpa foto.');
     if(files.length && !isDemo && !drive.connected) return setError('Hubungkan Google Drive satu kali untuk menyimpan foto.');
     if(files.length && !isDemo && !partner?.google_drive_email) return setError('Pasangan perlu menghubungkan akun Google Drive satu kali sebelum foto dapat dibagikan secara privat.');
@@ -167,6 +168,6 @@ export default function Memories({ memories, places, photos = [], onPhotosChange
       <h3>{memories.length ? 'No memories in this mood.' : 'The best days are yet to come.'}</h3>
       <p>{memories.length ? 'Pilih mood lain untuk melihat kenangan.' : 'Mulai album kenangan pertama kalian di sini.'}</p>
       <button className="btn btn-primary" onClick={() => setEditing({})}><Plus size={16}/> Add our first memory</button></div>}</>}
-    {editing && <MemoryForm initial={editing} places={places} onSave={onSave} onClose={() => setEditing(null)} onPhotosChange={onPhotosChange} onDriveConnected={onDriveConnected} members={members} user={user} isDemo={isDemo} onPartialError={setError}/>}
+    {editing && <MemoryForm initial={editing} places={places} onSave={onSave} onClose={() => setEditing(null)} onPhotosChange={onPhotosChange} onDriveConnected={onDriveConnected} members={members} user={user} photos={photos} isDemo={isDemo} onPartialError={setError}/>}
   </main>;
 }
