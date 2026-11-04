@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase, isConfigured, CATEGORIES, normalizeUrl, getSource, placeholderTitle, localDate } from './lib';
 import Memories from './Memories';
+import OurMap from './OurMap';
 
 const defaultDemoPlaces = [
   { id: 'd1', title: 'Little coffee corner', category: 'Cafe', city: 'Jakarta Selatan', status: 'want', is_favorite: true, notes: 'Cozy banget, coba weekend!', saved_by: 'demo-you', source_url: 'https://www.instagram.com/', created_at: '2026-10-29T10:00:00Z' },
@@ -126,13 +127,30 @@ function FormModal({ initial, onClose, onSave, busy }) {
   const [city, setCity] = useState(initial?.city || '');
   const [notes, setNotes] = useState(initial?.notes || '');
   const [status, setStatus] = useState(initial?.status || 'want');
+  const [cover,setCover] = useState(initial?.cover_url || '');
+  const [latitude,setLatitude] = useState(initial?.latitude ?? '');
+  const [longitude,setLongitude] = useState(initial?.longitude ?? '');
+  const [previewStatus,setPreviewStatus] = useState('');
+  const tryCover = async () => {
+    if (cover || !url.startsWith('https://') || !supabase) return;
+    setPreviewStatus('Looking for a cover…');
+    try {
+      const {data,error} = await supabase.functions.invoke('place-preview',{body:{url}});
+      if(error) throw error;
+      if(data?.cover_url) {setCover(data.cover_url);setPreviewStatus('Video cover found ♡');}
+      else setPreviewStatus('No automatic cover available. You can paste a cover URL below.');
+    } catch{setPreviewStatus('Preview unavailable. You can paste a cover URL manually.');}
+  };
   const [error, setError] = useState('');
   useEffect(() => { const key = (e) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key); }, [onClose]);
   const submit = async e => {
     e.preventDefault(); setError('');
     try {
       if (!editing) normalizeUrl(url);
-      await onSave({ url, title: title.trim(), category, city: city.trim(), notes: notes.trim(), status }, initial);
+      if(cover && (!/^https:\/\//i.test(cover)||cover.length>1800))throw new Error('Cover image harus link HTTPS yang valid.');
+      const lat=latitude===''?null:Number(latitude),lon=longitude===''?null:Number(longitude);
+      if((lat===null)!==(lon===null) || (lat!==null&&(!Number.isFinite(lat)||Math.abs(lat)>90))||(lon!==null&&(!Number.isFinite(lon)||Math.abs(lon)>180)))throw new Error('Isi latitude dan longitude yang valid, atau kosongkan keduanya.');
+      await onSave({ url, title: title.trim(), category, city: city.trim(), notes: notes.trim(), status, cover_url:cover||null,latitude:lat,longitude:lon }, initial);
       onClose();
     } catch(err) { setError(err.message || 'Gagal menyimpan.'); }
   };
@@ -140,10 +158,12 @@ function FormModal({ initial, onClose, onSave, busy }) {
     <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div className="modal-top"><div><span className="eyebrow text-pink">LITTLE ADVENTURES</span><h2 id="modal-title">{editing ? 'Edit this place' : 'Save a new place'} <span>♡</span></h2></div><button aria-label="Close" className="icon-button" onClick={onClose}><X size={20}/></button></div>
       <form className="place-form" onSubmit={submit}>
-        <label>Social media / Google Maps link <span className="required">*</span><div className="input-icon"><LinkIcon size={17}/><input type="url" placeholder="https://www.instagram.com/reel/..." required disabled={editing} value={url} onChange={e => setUrl(e.target.value)} /></div></label>
+        <label>Social media / Google Maps link <span className="required">*</span><div className="input-icon"><LinkIcon size={17}/><input type="url" placeholder="https://www.instagram.com/reel/..." required disabled={editing} value={url} onChange={e => setUrl(e.target.value)} onBlur={tryCover} /></div></label>
         <label>Nama tempat <span className="sub-label">(kalau belum tahu, boleh kosong)</span><input maxLength={160} placeholder="Misalnya: Hidden café in Bandung" value={title} onChange={e => setTitle(e.target.value)} /></label>
+        <label>Cover image (auto-detect dari TikTok jika tersedia)<input type="url" maxLength={1800} placeholder="https://...image.jpg" value={cover} onChange={e=>setCover(e.target.value)}/>{previewStatus && <small className="muted">{previewStatus}</small>}{cover && <img className="form-cover-preview" src={cover} alt="Cover preview" referrerPolicy="no-referrer" onError={e=>e.currentTarget.style.display='none'}/>}</label>
         <label>Category<div className="category-choices">{CATEGORIES.map(c => <button className={category === c.value ? 'selected' : ''} type="button" key={c.value} onClick={() => setCategory(c.value)}><span>{c.emoji}</span>{c.label}</button>)}</div></label>
         <label>Area / kota<input maxLength={100} placeholder="Misalnya: Jakarta Selatan" value={city} onChange={e => setCity(e.target.value)} /></label>
+        <div className="place-coordinate-row"><label>Latitude (untuk Our Map)<input type="number" step="any" min="-90" max="90" placeholder="-6.2088" value={latitude} onChange={e=>setLatitude(e.target.value)}/></label><label>Longitude<input type="number" step="any" min="-180" max="180" placeholder="106.8456" value={longitude} onChange={e=>setLongitude(e.target.value)}/></label></div><small className="muted">Salin koordinat dari Google Maps. Kedua kolom opsional.</small>
         <label>Catatan pribadi<textarea rows={3} maxLength={2000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Kenapa pengen ke sini? Apa yang mau dicoba?" /></label>
         <label>Status<select value={status} onChange={e => setStatus(e.target.value)}><option value="want">♡ Want to go</option><option value="visited">✓ Visited</option></select></label>
         {error && <div className="alert alert--error">{error}</div>}
