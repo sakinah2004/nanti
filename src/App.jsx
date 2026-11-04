@@ -8,6 +8,7 @@ import {
 import { supabase, isConfigured, CATEGORIES, normalizeUrl, getSource, placeholderTitle, localDate } from './lib';
 import Memories from './Memories';
 import OurMap from './OurMap';
+import './extraFeatures.css';
 
 const defaultDemoPlaces = [
   { id: 'd1', title: 'Little coffee corner', category: 'Cafe', city: 'Jakarta Selatan', status: 'want', is_favorite: true, notes: 'Cozy banget, coba weekend!', saved_by: 'demo-you', source_url: 'https://www.instagram.com/', created_at: '2026-10-29T10:00:00Z' },
