@@ -61,9 +61,10 @@ revoke all on public.memory_photos from anon, authenticated;
 grant select,insert,delete on public.memory_photos to authenticated;
 
 -- App only needs the authenticated user's pair metadata, never blanket anonymous access.
+-- Avoid a public SECURITY DEFINER RPC that could reveal other couples' places.
+alter function public.memory_place_in_pair(uuid,uuid) security invoker;
 revoke all on function public.memory_place_in_pair(uuid,uuid) from public, anon, authenticated;
--- Used by memories row policies, not intended as a public RPC call.
--- The RLS policy expression executes it with its creator's definer privileges.
+grant execute on function public.memory_place_in_pair(uuid,uuid) to authenticated;
 
 do $$ begin
   if not exists(select 1 from pg_publication_tables
